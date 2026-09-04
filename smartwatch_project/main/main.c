@@ -4,6 +4,7 @@
 #include "freertos/task.h"
 #include "driver/gpio.h"
 #include "ui.h"
+#include "bsp_es8311.h"
 
 #define MOTOR_VIBRATOR_PIN 18
 #define BATTERY_ENABLE_PIN 15
@@ -27,7 +28,7 @@ void app_main(void)
     init_gpio();
     ui_display_init();
     ui_draw_text("EDGE Hardware", "System: Booting...");
-    ESP_LOGI(TAG, "Starting Audio module...");
+    ESP_LOGI(TAG, "Empezando Audio module...");
        
     vTaskDelay(pdMS_TO_TICKS(2000)); // Wait 2 seconds
 
@@ -36,7 +37,7 @@ void app_main(void)
 
     while(true)
     {
-        sprintf(telemetry_buffer, "Telemetria: Active\nUptime: %d seconds", counter);
+        sprintf(telemetry_buffer, "Telemetria: Activa\nTiempo: %d seconds", counter);
         ui_draw_text("EDGE Hardware", telemetry_buffer);   
         counter++;
         vTaskDelay(pdMS_TO_TICKS(1000));

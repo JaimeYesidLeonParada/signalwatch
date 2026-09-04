@@ -20,7 +20,6 @@
 #define LCD_H_RES       240
 #define LCD_V_RES       280
 
-// Pointers to remember our labels so we can update them safely
 static lv_obj_t * title_label = NULL;
 static lv_obj_t * subtitle_label = NULL;
 static const char *TAG = "esp32_c6_ui_module";
