@@ -9,6 +9,7 @@ static i2c_master_dev_handle_t rtc_dev_handle;
 
 // Funciones para convertir BCD a Decimal
 static uint8_t bcd2dec(uint8_t val) { return ((val / 16 * 10) + (val % 16)); }
+static uint8_t dec2bcd(uint8_t val) { return ((val / 10 * 16) + (val % 10)); }
 
 void rtc_init(i2c_master_bus_handle_t bus_handle)
 {
@@ -19,7 +20,6 @@ void rtc_init(i2c_master_bus_handle_t bus_handle)
         .scl_speed_hz = 100000,
     };
     ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_cfg, &rtc_dev_handle));
-    ESP_LOGI(TAG, "RTC PCF85063 device added to I2C bus.");
 }
 
 void rtc_get_time_str(char *time_str, size_t max_len)
@@ -40,5 +40,31 @@ void rtc_get_time_str(char *time_str, size_t max_len)
     } else {
         snprintf(time_str, max_len, "Error RTC");
         ESP_LOGE(TAG, "Failed to read RTC");
+    }
+}
+
+void rtc_set_time(uint16_t year, uint8_t month, uint8_t day, uint8_t hr, uint8_t min, uint8_t sec)
+{
+    // El PCF85063 guarda el año de 0 a 99
+    if (year >= 2000) year -= 2000;
+
+    // Buffer: [Registro inicial] + [Seg] + [Min] + [Hora] + [Día] + [DíaSemana] + [Mes] + [Año]
+    uint8_t write_data[8];
+    write_data[0] = 0x04; // Registro 0x04 (Segundos)
+    
+    write_data[1] = dec2bcd(sec);
+    write_data[2] = dec2bcd(min);
+    write_data[3] = dec2bcd(hr);
+    write_data[4] = dec2bcd(day);
+    write_data[5] = 0; // Día de la semana (se puede dejar en 0 por ahora)
+    write_data[6] = dec2bcd(month);
+    write_data[7] = dec2bcd((uint8_t)year);
+
+    esp_err_t err = i2c_master_transmit(rtc_dev_handle, write_data, sizeof(write_data), -1);
+    
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Hora del RTC configurada correctamente");
+    } else {
+        ESP_LOGE(TAG, "Error configurando el RTC");
     }
 }

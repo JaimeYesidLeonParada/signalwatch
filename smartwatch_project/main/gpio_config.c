@@ -1,8 +1,33 @@
 #include "gpio_config.h"
 #include "driver/gpio.h"
+#include "driver/i2c_master.h"
+#include "vuvometro.h"
+#include "rtc_module.h"
+#include "ui.h"
 
 #define MOTOR_VIBRATOR_PIN 18
 #define BATTERY_ENABLE_PIN 15
+#define I2C_SDA_PIN 8
+#define I2C_SCL_PIN 7
+
+void config_init_modules(void)
+{
+    ui_display_init();
+    
+    i2c_master_bus_config_t i2c_mst_config = {
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .i2c_port = I2C_NUM_0,
+        .scl_io_num = I2C_SCL_PIN,
+        .sda_io_num = I2C_SDA_PIN,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
+    };
+    i2c_master_bus_handle_t bus_handle;
+    ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_mst_config, &bus_handle));
+
+    vuvometro_init(bus_handle);
+    rtc_init(bus_handle);
+}
 
 void gpio_config_init(void)
 {
@@ -14,4 +39,6 @@ void gpio_config_init(void)
 
     gpio_set_level(MOTOR_VIBRATOR_PIN, 0); // Motor apagado
     gpio_set_level(BATTERY_ENABLE_PIN, 1); // Batería habilitada
+
+    config_init_modules();
 }
