@@ -10,30 +10,14 @@
 
 static const char *TAG = "vuvometro_module";
 
-#define I2C_SDA_PIN 8
-#define I2C_SCL_PIN 7
-
 // Importamos la variable del micrófono instanciada en bsp_es8311.c
 extern esp_codec_dev_handle_t input_dev;
 
-void vuvometro_init(void)
+void vuvometro_init(i2c_master_bus_handle_t bus_handle)
 {
-    ESP_LOGI(TAG, "Initializing I2C Master...");
-    i2c_master_bus_config_t i2c_mst_config = {
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .i2c_port = I2C_NUM_0,
-        .scl_io_num = I2C_SCL_PIN,
-        .sda_io_num = I2C_SDA_PIN,
-        .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = true,
-    };
-    i2c_master_bus_handle_t bus_handle;
-    ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_mst_config, &bus_handle));
-
-    // 4. Inicializar el Codec de Audio (usando tu BSP)
     ESP_LOGI(TAG, "Initializing Audio BSP...");
     bsp_es8311_init(bus_handle);
-    bsp_es8311_set_in_volume(40.0); // Ajustar ganancia del micrófono
+    bsp_es8311_set_in_volume(40.0); 
 }
 
 static void mic_vu_task(void *arg)

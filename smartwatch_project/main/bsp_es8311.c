@@ -139,9 +139,6 @@ void bsp_es8311_recording(uint8_t *data, size_t limit_size)
         printf("Read error %d\n", err);
 }
 
-
-
-
 void bsp_es8311_playing(uint8_t *data, size_t limit_size)
 {
     int err = 0;
