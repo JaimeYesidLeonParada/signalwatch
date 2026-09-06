@@ -4,6 +4,7 @@
 #include "vuvometro.h"
 #include "rtc_module.h"
 #include "ui.h"
+#include "button_module.h"
 
 #define MOTOR_VIBRATOR_PIN 18
 #define BATTERY_ENABLE_PIN 15
@@ -27,6 +28,8 @@ void config_init_modules(void)
 
     vuvometro_init(bus_handle);
     rtc_init(bus_handle);
+
+    button_init();
 }
 
 void gpio_config_init(void)
