@@ -12,6 +12,8 @@ static const char *TAG = "battery_module";
 static adc_oneshot_unit_handle_t adc1_handle;
 static adc_cali_handle_t cali_handle;
 static bool cali_enable = false;
+// Variable para recordar el porcentaje mínimo histórico (inicia en 101 para que la primera lectura lo sobreescriba)
+static int min_battery_pct = 100;
 
 void battery_init(void)
 {
@@ -67,8 +69,21 @@ int battery_get_voltage_mv(void)
 int battery_get_percentage(void)
 {
     int mv = battery_get_voltage_mv();
-    // Batería LiPo estándar: 4200mV (100%) - 3300mV (0%)
-    if (mv >= 4200) return 100;
-    if (mv <= 3300) return 0;
-    return ((mv - 3300) * 100) / (4200 - 3300);
+    int current_pct = 0;
+
+    // Batería LiPo estándar: 4200mV (100%) - 3000mV (0%)
+    if (mv >= 4200) {
+        current_pct = 100;
+    } else if (mv <= 3000) {
+        current_pct = 0;
+    } else {
+        current_pct = ((mv - 3000) * 100) / (4200 - 3000);
+    }
+
+    // Filtro: Si es la primera lectura (100) o si el porcentaje bajó, actualizamos el mínimo
+    if (min_battery_pct == 100 || current_pct < min_battery_pct) {
+        min_battery_pct = current_pct;
+    }
+
+    return min_battery_pct;
 }

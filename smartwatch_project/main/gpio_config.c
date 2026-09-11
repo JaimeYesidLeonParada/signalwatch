@@ -6,6 +6,7 @@
 #include "ui.h"
 #include "button_module.h"
 #include "battery_module.h"
+#include "touch_module.h"
 
 #define MOTOR_VIBRATOR_PIN 18
 #define BATTERY_ENABLE_PIN 15
@@ -29,6 +30,7 @@ void config_init_modules(void)
 
     vuvometro_init(bus_handle);
     rtc_init(bus_handle);
+    touch_init(bus_handle);
 
     button_init();
     battery_init();
