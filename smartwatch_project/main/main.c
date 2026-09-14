@@ -8,6 +8,7 @@
 #include "gpio_config.h"
 #include "rtc_module.h"
 #include "battery_module.h"
+#include "ei_wrapper.h"
 
 static const char *TAG = "esp32_c6_board";
 
@@ -23,6 +24,8 @@ void app_main(void)
     char telemetry_buffer[128];
     char time_str[32];
 
+    ei_wrapper_init();
+
     while(true)
     {
         rtc_get_time_str(time_str, sizeof(time_str));
@@ -31,7 +34,7 @@ void app_main(void)
         int bat_pct = battery_get_percentage();
         
         // Agregamos la batería al texto
-        sprintf(telemetry_buffer, "Telemetria: Activa\nTiempo: %s\nBateria: %d mV (%d%%)", 
+        sprintf(telemetry_buffer, "ESP32-C6: Activa\nTiempo: %s\nBateria: %d mV (%d%%)", 
                 time_str, bat_mv, bat_pct);
         ui_draw_text("EDGE Hardware", telemetry_buffer);   
         vTaskDelay(pdMS_TO_TICKS(1000));
