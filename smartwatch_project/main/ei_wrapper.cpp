@@ -7,6 +7,9 @@
 
 static const char *TAG = "edge_ai";
 
+// Puntero global temporal para compartir el audio con la función de Edge Impulse
+static int16_t *current_audio_buffer = NULL;
+
 // ============================================================================
 // NATIVE PORTING: Connecting Edge Impulse with ESP32-C6 hardware
 // ============================================================================
@@ -49,6 +52,16 @@ EI_IMPULSE_ERROR ei_run_impulse_check_canceled() {
 }
 
 // ============================================================================
+// Callback que Edge Impulse llama para pedir los datos de audio
+int microphone_audio_signal_get_data(size_t offset, size_t length, float *out_ptr) {
+    for (size_t i = 0; i < length; i++) {
+        // Convertimos el audio de 16 bits (entero) a float
+        out_ptr[i] = (float)current_audio_buffer[offset + i];
+    }
+    return 0;
+}
+
+// ============================================================================
 // WRAPPER FUNCTIONS
 // ============================================================================
 
@@ -63,5 +76,34 @@ void ei_wrapper_init(void) {
 }
 
 void ei_wrapper_classify(int16_t *audio_buffer, int buffer_size) {
-    // Left empty for now. One step at a time.
+    if (buffer_size < EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE) {
+        ESP_LOGE(TAG, "El buffer de audio es muy pequeno. Se esperaban %d muestras.", EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE);
+        return;
+    }
+
+    // Asignamos el buffer actual al puntero global
+    current_audio_buffer = audio_buffer;
+
+    // Configuramos la estructura de la senal para Edge Impulse
+    signal_t signal;
+    signal.total_length = EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE;
+    signal.get_data = &microphone_audio_signal_get_data;
+
+    // Ejecutamos la inferencia
+    ei_impulse_result_t result = { 0 };
+    ESP_LOGI(TAG, "Ejecutando inferencia...");
+    
+    // El 'false' al final desactiva el modo debug detallado para ahorrar tiempo
+    EI_IMPULSE_ERROR err = run_classifier(&signal, &result, false);
+    
+    if (err != EI_IMPULSE_OK) {
+        ESP_LOGE(TAG, "Fallo al ejecutar el clasificador (%d)", err);
+        return;
+    }
+
+    // Imprimimos las predicciones!
+    ESP_LOGI(TAG, "Predicciones (Tardo %d ms):", result.timing.classification);
+    for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
+        ESP_LOGI(TAG, "    %s: %.5f", result.classification[ix].label, result.classification[ix].value);
+    }
 }

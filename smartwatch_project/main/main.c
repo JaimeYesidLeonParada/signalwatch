@@ -9,6 +9,7 @@
 #include "rtc_module.h"
 #include "battery_module.h"
 #include "ei_wrapper.h"
+#include "bsp_es8311.h"
 
 static const char *TAG = "esp32_c6_board";
 
@@ -17,7 +18,7 @@ void app_main(void)
     gpio_config_init();
     
     ui_draw_text("EDGE Hardware", "System: Booting...");
-    vuvometro_start();
+    //vuvometro_start();
     // Sábado 5 de Septiembre de 2026, 12:44:21 PM
     //rtc_set_time(2026, 9, 5, 12, 50, 21);
 
