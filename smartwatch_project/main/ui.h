@@ -2,7 +2,8 @@
 #define UI_H
 
 void ui_display_init(void);
-// Update the text on the screen dynamically
-void ui_draw_text(const char * title_str, const char * subtitle_str);
+void ui_post_clock_msg(const char *time_str);
+void ui_post_battery_msg(int bat_mv, int bat_pct);
+void ui_post_inference_msg(const char *label, float confidence);
 
-#endif // UI_H
+#endif

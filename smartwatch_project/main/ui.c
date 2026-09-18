@@ -1,4 +1,8 @@
 #include "ui.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include <string.h>
 #include "driver/gpio.h"
 #include "lvgl.h"
 #include "esp_lvgl_port.h"
@@ -25,6 +29,29 @@ static lv_obj_t * subtitle_label = NULL;
 static lv_obj_t * btn = NULL;
 static const char *TAG = "esp32_c6_ui_module";
 lv_disp_t * disp;
+
+typedef enum {
+    UI_MSG_CLOCK,
+    UI_MSG_BATTERY,
+    UI_MSG_INFERENCE,
+} ui_msg_type_t;
+
+typedef struct {
+    ui_msg_type_t type;
+    union {
+        struct { char time_str[16]; } clock;
+        struct { int bat_mv; int bat_pct; } battery;
+        struct { char label[32]; float confidence; } inference;
+    } data;
+} ui_msg_t;
+
+static QueueHandle_t ui_queue = NULL;
+static void ui_task(void *arg);
+
+// Ultimo valor conocido de cada dato, para recomponer la linea de telemetria
+static char s_time_str[16] = "--:--:--";
+static int  s_bat_mv = 0;
+static int  s_bat_pct = 0;
 
 void ui_display_init(void)
 {
@@ -92,6 +119,9 @@ void ui_display_init(void)
         }
     };
     disp = lvgl_port_add_disp(&disp_cfg);
+
+    ui_queue = xQueueCreate(5, sizeof(ui_msg_t));
+    xTaskCreate(ui_task, "ui_task", 4096, NULL, 4, NULL);
 }
 
 // Se ejecuta automáticamente al tocar el botón en pantalla
@@ -109,7 +139,7 @@ static void btn_event_cb(lv_event_t * e)
     }
 }
 
-void ui_draw_text(const char * title_str, const char * subtitle_str)
+static void ui_draw_text_internal(const char * title_str, const char * subtitle_str)
 {
     // 1. Get the active screen and set background
     lv_obj_t * scr = lv_disp_get_scr_act(disp);
@@ -150,4 +180,61 @@ void ui_draw_text(const char * title_str, const char * subtitle_str)
         lv_label_set_text(btn_label, "TOCAME");
         lv_obj_center(btn_label);
     }
+}
+
+static void ui_redraw_telemetry(void)
+{
+    char subtitle[128];
+    snprintf(subtitle, sizeof(subtitle),
+             "ESP32-C6: Activa\nTiempo: %s\nBateria: %d mV (%d%%)",
+             s_time_str, s_bat_mv, s_bat_pct);
+    ui_draw_text_internal("EDGE Hardware", subtitle);
+}
+
+static void ui_task(void *arg)
+{
+    ui_msg_t msg;
+    while (1) {
+        if (xQueueReceive(ui_queue, &msg, portMAX_DELAY) == pdTRUE) {
+            if (lvgl_port_lock(-1)) {
+                switch (msg.type) {
+                    case UI_MSG_CLOCK:
+                        strncpy(s_time_str, msg.data.clock.time_str, sizeof(s_time_str) - 1);
+                        s_time_str[sizeof(s_time_str) - 1] = '\0';
+                        ui_redraw_telemetry();
+                        break;
+                    case UI_MSG_BATTERY:
+                        s_bat_mv = msg.data.battery.bat_mv;
+                        s_bat_pct = msg.data.battery.bat_pct;
+                        ui_redraw_telemetry();
+                        break;
+                    case UI_MSG_INFERENCE:
+                        // Se conecta en el siguiente paso, con el layout nuevo
+                        break;
+                }
+                lvgl_port_unlock();
+            }
+        }
+    }
+}
+
+void ui_post_clock_msg(const char *time_str)
+{
+    ui_msg_t msg = { .type = UI_MSG_CLOCK };
+    strncpy(msg.data.clock.time_str, time_str, sizeof(msg.data.clock.time_str) - 1);
+    xQueueSend(ui_queue, &msg, 0);
+}
+
+void ui_post_battery_msg(int bat_mv, int bat_pct)
+{
+    ui_msg_t msg = { .type = UI_MSG_BATTERY, .data.battery = { bat_mv, bat_pct } };
+    xQueueSend(ui_queue, &msg, 0);
+}
+
+void ui_post_inference_msg(const char *label, float confidence)
+{
+    ui_msg_t msg = { .type = UI_MSG_INFERENCE };
+    strncpy(msg.data.inference.label, label, sizeof(msg.data.inference.label) - 1);
+    msg.data.inference.confidence = confidence;
+    xQueueSend(ui_queue, &msg, 0);
 }

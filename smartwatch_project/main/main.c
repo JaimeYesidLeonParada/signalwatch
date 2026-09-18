@@ -16,13 +16,11 @@ static const char *TAG = "esp32_c6_board";
 void app_main(void)
 {
     gpio_config_init();
-    
-    ui_draw_text("EDGE Hardware", "System: Booting...");
     //vuvometro_start();
     // Sábado 5 de Septiembre de 2026, 12:44:21 PM
     //rtc_set_time(2026, 9, 5, 12, 50, 21);
 
-    char telemetry_buffer[128];
+    //char telemetry_buffer[128];
     char time_str[32];
 
     ei_wrapper_init();
@@ -35,9 +33,10 @@ void app_main(void)
         int bat_pct = battery_get_percentage();
         
         // Agregamos la batería al texto
-        sprintf(telemetry_buffer, "ESP32-C6: Activa\nTiempo: %s\nBateria: %d mV (%d%%)", 
-                time_str, bat_mv, bat_pct);
-        ui_draw_text("EDGE Hardware", telemetry_buffer);   
+        //sprintf(telemetry_buffer, "ESP32-C6: Activa\nTiempo: %s\nBateria: %d mV (%d%%)", 
+        //        time_str, bat_mv, bat_pct);
+        ui_post_clock_msg(time_str);
+        ui_post_battery_msg(bat_mv, bat_pct);  
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
