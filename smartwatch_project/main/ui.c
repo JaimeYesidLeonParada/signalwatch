@@ -134,7 +134,14 @@ static void ui_update_clock(const char *time_str)
         lv_obj_set_style_text_font(clock_label, &lv_font_montserrat_48, LV_PART_MAIN);
         lv_obj_align(clock_label, LV_ALIGN_TOP_MID, 0, 15);
     }
-    lv_label_set_text(clock_label, time_str);
+
+    int hr = 0, min = 0, sec = 0;
+    sscanf(time_str, "%d:%d:%d", &hr, &min, &sec);
+
+    int hr12 = hr % 12;
+    if (hr12 == 0) hr12 = 12;
+
+    lv_label_set_text_fmt(clock_label, "%d:%02d", hr12, min);
 }
 
 static void ui_update_battery(int bat_pct)
@@ -143,7 +150,7 @@ static void ui_update_battery(int bat_pct)
     if (battery_label == NULL) {
         battery_label = lv_label_create(scr);
         lv_obj_set_style_text_color(battery_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-        lv_obj_align(battery_label, LV_ALIGN_TOP_MID, 0, 75);
+        lv_obj_align(battery_label, LV_ALIGN_TOP_MID, 0, 90);
     }
     lv_label_set_text_fmt(battery_label, "Bateria: %d%%", bat_pct);
 }
@@ -154,7 +161,7 @@ static void ui_update_inference(const char *label, float confidence)
     if (inference_label == NULL) {
         inference_label = lv_label_create(scr);
         lv_obj_set_style_text_color(inference_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-        lv_obj_align(inference_label, LV_ALIGN_TOP_MID, 0, 110);
+        lv_obj_align(inference_label, LV_ALIGN_TOP_MID, 0, 125);
     }
     int pct = (int)(confidence * 100.0f + 0.5f); // redondeo
     lv_label_set_text_fmt(inference_label, "%s: %d%%", label, pct);
@@ -175,7 +182,7 @@ static void ui_update_vu(int level)
         lv_obj_set_style_bg_color(vu_bar, lv_color_hex(0x00AAFF), LV_PART_INDICATOR);
         lv_obj_align(vu_bar, LV_ALIGN_BOTTOM_MID, 0, -20);
     }
-    lv_bar_set_value(vu_bar, level, LV_ANIM_ON); // sin animacion, salto instantaneo
+    lv_bar_set_value(vu_bar, level, LV_ANIM_OFF); // sin animacion, salto instantaneo
 }
 
 static void ui_task(void *arg)

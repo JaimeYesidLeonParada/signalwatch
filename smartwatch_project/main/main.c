@@ -31,6 +31,6 @@ void app_main(void)
         
         ui_post_clock_msg(time_str);
         ui_post_battery_msg(bat_pct);  
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }

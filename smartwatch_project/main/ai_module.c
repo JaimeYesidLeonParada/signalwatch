@@ -9,7 +9,7 @@
 #include "ui.h"
 
 #define AUDIO_BUFFER_SIZE   16000   // 1 s @ 16 kHz (lo que exige el modelo)
-#define CHUNK_SAMPLES       4000    // 0.25 s
+#define CHUNK_SAMPLES       1000    // 0.25 s
 #define CHUNKS_PER_WINDOW   (AUDIO_BUFFER_SIZE / CHUNK_SAMPLES)
 #define AI_TASK_PRIORITY        5
 #define AI_TASK_PRIORITY_BUSY   0  
