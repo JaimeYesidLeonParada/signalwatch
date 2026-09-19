@@ -20,7 +20,6 @@ void app_main(void)
     // Sábado 5 de Septiembre de 2026, 12:44:21 PM
     //rtc_set_time(2026, 9, 5, 12, 50, 21);
 
-    //char telemetry_buffer[128];
     char time_str[32];
 
     ei_wrapper_init();
@@ -28,15 +27,10 @@ void app_main(void)
     while(true)
     {
         rtc_get_time_str(time_str, sizeof(time_str));
-        // Leemos batería
-        int bat_mv = battery_get_voltage_mv();
         int bat_pct = battery_get_percentage();
         
-        // Agregamos la batería al texto
-        //sprintf(telemetry_buffer, "ESP32-C6: Activa\nTiempo: %s\nBateria: %d mV (%d%%)", 
-        //        time_str, bat_mv, bat_pct);
         ui_post_clock_msg(time_str);
-        ui_post_battery_msg(bat_mv, bat_pct);  
+        ui_post_battery_msg(bat_pct);  
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

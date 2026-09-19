@@ -6,47 +6,19 @@
 #include "ei_wrapper.h"
 #include <stdlib.h>
 #include "esp_timer.h"
+#include "ui.h"
 
 #define AUDIO_BUFFER_SIZE   16000   // 1 s @ 16 kHz (lo que exige el modelo)
 #define CHUNK_SAMPLES       4000    // 0.25 s
 #define CHUNKS_PER_WINDOW   (AUDIO_BUFFER_SIZE / CHUNK_SAMPLES)
+#define AI_TASK_PRIORITY        5
+#define AI_TASK_PRIORITY_BUSY   0  
 
 static const char *TAG = "ai_module";
 
 // Import from the audio BSP
 extern esp_codec_dev_handle_t input_dev;
 
-// funcion que no usa el audio en partes, 
-/*static void audio_inference_task(void *arg) {
-    ESP_LOGI(TAG, "Allocating 32KB of memory for the audio buffer...");
-    
-    // Allocate memory on the heap to prevent Stack Overflow
-    int16_t *audio_buffer = (int16_t *)malloc(AUDIO_BUFFER_SIZE * sizeof(int16_t));
-    
-    if (audio_buffer == NULL) {
-        ESP_LOGE(TAG, "Insufficient memory for audio buffer!");
-        vTaskDelete(NULL);
-    }
-
-    size_t bytes_to_read = AUDIO_BUFFER_SIZE * sizeof(int16_t);
-
-    while(1) {
-        ESP_LOGI(TAG, "Listening (1 second)... Say a keyword!");
-
-        // Read 1 second of audio from the ES8311 driver
-        int err = esp_codec_dev_read(input_dev, (void *)audio_buffer, bytes_to_read);
-        
-        if (err == ESP_CODEC_DEV_OK) {
-            // Pass the buffer to the neural network
-            ei_wrapper_classify(audio_buffer, AUDIO_BUFFER_SIZE);
-        } else {
-            ESP_LOGE(TAG, "Error reading microphone: %d", err);
-        }
-
-        // Small delay to yield to other tasks
-        vTaskDelay(pdMS_TO_TICKS(50)); 
-    }
-}*/
 
 static void audio_inference_task(void *arg) {
     int16_t *audio_buffer = (int16_t *)malloc(AUDIO_BUFFER_SIZE * sizeof(int16_t));
@@ -82,19 +54,26 @@ static void audio_inference_task(void *arg) {
                 sum += abs(chunk[i]);
             }
             avg_intensity[c] = (int)(sum / CHUNK_SAMPLES);
+
+            int level = avg_intensity[c] / 8; // ~800 de pico -> 100%
+            if (level > 100) level = 100;
+            ui_post_audio_level_msg(level);
         }
 
         if (window_ok) {
             ESP_LOGI(TAG, "Ventana capturada en %lld ms", (esp_timer_get_time() - t_start) / 1000);
-            ESP_LOGI(TAG, "Intensidad por trozo: [%d, %d, %d, %d]", avg_intensity[0], avg_intensity[1], avg_intensity[2], avg_intensity[3]);
+            ESP_LOGI(TAG, "Intensidad por trozo: [%d, %d, %d, %d]",
+                 avg_intensity[0], avg_intensity[1], avg_intensity[2], avg_intensity[3]);
+
+            vTaskPrioritySet(NULL, AI_TASK_PRIORITY_BUSY);
             ei_wrapper_classify(audio_buffer, AUDIO_BUFFER_SIZE);
-        }
+            vTaskPrioritySet(NULL, AI_TASK_PRIORITY);
+    }
 
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
 
 void ai_module_start(void) {
-    // Launch the AI task (8KB stack is safe for TFLite Micro)
-    xTaskCreate(audio_inference_task, "ai_task", 8192, NULL, 5, NULL);
+    xTaskCreate(audio_inference_task, "ai_task", 8192, NULL, AI_TASK_PRIORITY, NULL);
 }

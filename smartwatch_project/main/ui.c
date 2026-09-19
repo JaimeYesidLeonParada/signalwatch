@@ -24,9 +24,12 @@
 #define LCD_H_RES       240
 #define LCD_V_RES       280
 
-static lv_obj_t * title_label = NULL;
-static lv_obj_t * subtitle_label = NULL;
-static lv_obj_t * btn = NULL;
+static lv_obj_t * clock_label = NULL;
+static lv_obj_t * battery_label = NULL;
+static lv_obj_t * inference_label = NULL;
+static lv_obj_t * vu_label = NULL;
+static lv_obj_t * vu_bar = NULL;
+
 static const char *TAG = "esp32_c6_ui_module";
 lv_disp_t * disp;
 
@@ -34,28 +37,24 @@ typedef enum {
     UI_MSG_CLOCK,
     UI_MSG_BATTERY,
     UI_MSG_INFERENCE,
+    UI_MSG_AUDIO_LEVEL,
 } ui_msg_type_t;
 
 typedef struct {
     ui_msg_type_t type;
     union {
         struct { char time_str[16]; } clock;
-        struct { int bat_mv; int bat_pct; } battery;
+        struct { int bat_pct; } battery;
         struct { char label[32]; float confidence; } inference;
+        struct { int level; } audio_level;
     } data;
 } ui_msg_t;
 
 static QueueHandle_t ui_queue = NULL;
 static void ui_task(void *arg);
 
-// Ultimo valor conocido de cada dato, para recomponer la linea de telemetria
-static char s_time_str[16] = "--:--:--";
-static int  s_bat_mv = 0;
-static int  s_bat_pct = 0;
-
 void ui_display_init(void)
 {
-     // 2. Turn on LCD backlight
     gpio_reset_pin(LCD_BL_PIN);
     gpio_set_direction(LCD_BL_PIN, GPIO_MODE_OUTPUT);
     gpio_set_level(LCD_BL_PIN, 1);
@@ -120,75 +119,63 @@ void ui_display_init(void)
     };
     disp = lvgl_port_add_disp(&disp_cfg);
 
+    lv_obj_set_style_bg_color(lv_disp_get_scr_act(disp), lv_color_hex(0x000000), LV_PART_MAIN);
+
     ui_queue = xQueueCreate(5, sizeof(ui_msg_t));
     xTaskCreate(ui_task, "ui_task", 4096, NULL, 4, NULL);
 }
 
-// Se ejecuta automáticamente al tocar el botón en pantalla
-static void btn_event_cb(lv_event_t * e)
+static void ui_update_clock(const char *time_str)
 {
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t * btn = lv_event_get_target(e);
-    
-    if(code == LV_EVENT_CLICKED) {
-        static uint8_t cnt = 0;
-        cnt++;
-        // Obtenemos el texto de adentro del botón y lo cambiamos
-        lv_obj_t * label = lv_obj_get_child(btn, 0);
-        lv_label_set_text_fmt(label, "Tocado: %d", cnt);
-    }
-}
-
-static void ui_draw_text_internal(const char * title_str, const char * subtitle_str)
-{
-    // 1. Get the active screen and set background
     lv_obj_t * scr = lv_disp_get_scr_act(disp);
-    lv_obj_set_style_bg_color(scr, lv_color_hex(0x1E1E1E), LV_PART_MAIN);
-
-    // 2. Title creation/update
-    if (title_label == NULL) {
-        // Create it only the first time
-        title_label = lv_label_create(scr);
-        
-        lv_obj_set_style_text_color(title_label, lv_color_hex(0x00FF00), LV_PART_MAIN);
-        lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 30);
+    if (clock_label == NULL) {
+        clock_label = lv_label_create(scr);
+        lv_obj_set_style_text_color(clock_label, lv_color_hex(0x00FF00), LV_PART_MAIN);
+        lv_obj_set_style_text_font(clock_label, &lv_font_montserrat_48, LV_PART_MAIN);
+        lv_obj_align(clock_label, LV_ALIGN_TOP_MID, 0, 15);
     }
-    // Set the dynamic text
-    lv_label_set_text(title_label, title_str);
-
-    // 3. Subtitle creation/update
-    if (subtitle_label == NULL) {
-        // Create it only the first time
-        subtitle_label = lv_label_create(scr);
-        lv_obj_set_style_text_color(subtitle_label, lv_color_hex(0xFF0000), LV_PART_MAIN);
-    }
-    // Set the dynamic text
-    lv_label_set_text(subtitle_label, subtitle_str);
-    lv_obj_set_style_text_align(subtitle_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align_to(subtitle_label, title_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
-
-    // 4. Botón interactivo para probar el touch
-    if (btn == NULL) {
-        btn = lv_btn_create(scr);
-        lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, 0, -20); // Abajo en el centro
-        
-        // Le asignamos el evento de toque
-        lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_ALL, NULL);
-        
-        // Le ponemos texto al botón
-        lv_obj_t * btn_label = lv_label_create(btn);
-        lv_label_set_text(btn_label, "TOCAME");
-        lv_obj_center(btn_label);
-    }
+    lv_label_set_text(clock_label, time_str);
 }
 
-static void ui_redraw_telemetry(void)
+static void ui_update_battery(int bat_pct)
 {
-    char subtitle[128];
-    snprintf(subtitle, sizeof(subtitle),
-             "ESP32-C6: Activa\nTiempo: %s\nBateria: %d mV (%d%%)",
-             s_time_str, s_bat_mv, s_bat_pct);
-    ui_draw_text_internal("EDGE Hardware", subtitle);
+    lv_obj_t * scr = lv_disp_get_scr_act(disp);
+    if (battery_label == NULL) {
+        battery_label = lv_label_create(scr);
+        lv_obj_set_style_text_color(battery_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        lv_obj_align(battery_label, LV_ALIGN_TOP_MID, 0, 75);
+    }
+    lv_label_set_text_fmt(battery_label, "Bateria: %d%%", bat_pct);
+}
+
+static void ui_update_inference(const char *label, float confidence)
+{
+    lv_obj_t * scr = lv_disp_get_scr_act(disp);
+    if (inference_label == NULL) {
+        inference_label = lv_label_create(scr);
+        lv_obj_set_style_text_color(inference_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        lv_obj_align(inference_label, LV_ALIGN_TOP_MID, 0, 110);
+    }
+    int pct = (int)(confidence * 100.0f + 0.5f); // redondeo
+    lv_label_set_text_fmt(inference_label, "%s: %d%%", label, pct);
+}
+
+static void ui_update_vu(int level)
+{
+    lv_obj_t * scr = lv_disp_get_scr_act(disp);
+    if (vu_bar == NULL) {
+        vu_label = lv_label_create(scr);
+        lv_obj_set_style_text_color(vu_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        lv_label_set_text(vu_label, "Volumen");
+        lv_obj_align(vu_label, LV_ALIGN_BOTTOM_MID, 0, -50);
+
+        vu_bar = lv_bar_create(scr);
+        lv_obj_set_size(vu_bar, 180, 20);
+        lv_bar_set_range(vu_bar, 0, 100);
+        lv_obj_set_style_bg_color(vu_bar, lv_color_hex(0x00AAFF), LV_PART_INDICATOR);
+        lv_obj_align(vu_bar, LV_ALIGN_BOTTOM_MID, 0, -20);
+    }
+    lv_bar_set_value(vu_bar, level, LV_ANIM_ON); // sin animacion, salto instantaneo
 }
 
 static void ui_task(void *arg)
@@ -199,18 +186,20 @@ static void ui_task(void *arg)
             if (lvgl_port_lock(-1)) {
                 switch (msg.type) {
                     case UI_MSG_CLOCK:
-                        strncpy(s_time_str, msg.data.clock.time_str, sizeof(s_time_str) - 1);
-                        s_time_str[sizeof(s_time_str) - 1] = '\0';
-                        ui_redraw_telemetry();
-                        break;
+                    ui_update_clock(msg.data.clock.time_str);
+                    break;
+                    
                     case UI_MSG_BATTERY:
-                        s_bat_mv = msg.data.battery.bat_mv;
-                        s_bat_pct = msg.data.battery.bat_pct;
-                        ui_redraw_telemetry();
-                        break;
+                    ui_update_battery(msg.data.battery.bat_pct);
+                    break;
+    
                     case UI_MSG_INFERENCE:
-                        // Se conecta en el siguiente paso, con el layout nuevo
-                        break;
+                    ui_update_inference(msg.data.inference.label, msg.data.inference.confidence);
+                    break;
+
+                    case UI_MSG_AUDIO_LEVEL:
+                    ui_update_vu(msg.data.audio_level.level);
+                    break;
                 }
                 lvgl_port_unlock();
             }
@@ -225,9 +214,9 @@ void ui_post_clock_msg(const char *time_str)
     xQueueSend(ui_queue, &msg, 0);
 }
 
-void ui_post_battery_msg(int bat_mv, int bat_pct)
+void ui_post_battery_msg(int bat_pct)
 {
-    ui_msg_t msg = { .type = UI_MSG_BATTERY, .data.battery = { bat_mv, bat_pct } };
+    ui_msg_t msg = { .type = UI_MSG_BATTERY, .data.battery = { bat_pct } };
     xQueueSend(ui_queue, &msg, 0);
 }
 
@@ -236,5 +225,11 @@ void ui_post_inference_msg(const char *label, float confidence)
     ui_msg_t msg = { .type = UI_MSG_INFERENCE };
     strncpy(msg.data.inference.label, label, sizeof(msg.data.inference.label) - 1);
     msg.data.inference.confidence = confidence;
+    xQueueSend(ui_queue, &msg, 0);
+}
+
+void ui_post_audio_level_msg(int level_pct)
+{
+    ui_msg_t msg = { .type = UI_MSG_AUDIO_LEVEL, .data.audio_level = { level_pct } };
     xQueueSend(ui_queue, &msg, 0);
 }

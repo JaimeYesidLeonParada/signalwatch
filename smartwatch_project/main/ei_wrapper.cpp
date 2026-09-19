@@ -4,6 +4,7 @@
 #include "esp_timer.h" 
 #include <stdarg.h>
 #include <stdlib.h>
+#include "ui.h"
 
 static const char *TAG = "edge_ai";
 
@@ -103,7 +104,12 @@ void ei_wrapper_classify(int16_t *audio_buffer, int buffer_size) {
 
     // Imprimimos las predicciones!
     ESP_LOGI(TAG, "Predicciones (Tardo %d ms):", result.timing.classification);
+    size_t best_ix = 0;
     for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
         ESP_LOGI(TAG, "    %s: %.5f", result.classification[ix].label, result.classification[ix].value);
+        if (result.classification[ix].value > result.classification[best_ix].value) {
+            best_ix = ix;
+        }
     }
+    ui_post_inference_msg(result.classification[best_ix].label, result.classification[best_ix].value);
 }
