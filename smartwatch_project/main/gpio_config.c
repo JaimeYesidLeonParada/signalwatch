@@ -1,7 +1,8 @@
 #include "gpio_config.h"
 #include "driver/gpio.h"
 #include "driver/i2c_master.h"
-#include "vuvometro.h"
+#include "ei_wrapper.h"
+#include "bsp_es8311.h"
 #include "rtc_module.h"
 #include "ui.h"
 #include "button_module.h"
@@ -29,13 +30,15 @@ void config_init_modules(void)
     i2c_master_bus_handle_t bus_handle;
     ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_mst_config, &bus_handle));
 
-    vuvometro_init(bus_handle);
+    bsp_es8311_init(bus_handle);
+    bsp_es8311_set_in_volume(40.0);
     rtc_init(bus_handle);
     touch_init(bus_handle);
 
     button_init();
     battery_init();
 
+    ei_wrapper_init();
     ai_module_start();
 }
 

@@ -7,13 +7,12 @@
 static const char *TAG = "battery_module";
 
 #define BAT_ADC_PIN 0 // GPIO0 es ADC1_CHANNEL_0 en el ESP32-C6
-#define VOLTAGE_DIVIDER_RATIO 3 // Multiplicador de hardware de la placa
+#define VOLTAGE_DIVIDER_RATIO 2.43f // Multiplicador de hardware de la placa
 
 static adc_oneshot_unit_handle_t adc1_handle;
 static adc_cali_handle_t cali_handle;
 static bool cali_enable = false;
-// Variable para recordar el porcentaje mínimo histórico (inicia en 101 para que la primera lectura lo sobreescriba)
-static int min_battery_pct = 100;
+static float smoothed_pct = -1.0f; // -1 = todavia sin ninguna lectura
 
 void battery_init(void)
 {
@@ -55,23 +54,22 @@ int battery_get_voltage_mv(void)
 
     int voltage_mv = 0;
     if (cali_enable) {
-        // Usa la curva calibrada de fábrica del chip
         ESP_ERROR_CHECK(adc_cali_raw_to_voltage(cali_handle, raw_val, &voltage_mv));
     } else {
-        // Respaldo crudo
         voltage_mv = (raw_val * 3300) / 4095;
     }
 
-    // Retorna el valor multiplicado por el divisor físico de la placa Waveshare
-    return voltage_mv * VOLTAGE_DIVIDER_RATIO;
+    int battery_mv = (int)(voltage_mv * VOLTAGE_DIVIDER_RATIO + 0.5f);
+    ESP_LOGI(TAG, "ADC crudo: %d, ADC mV: %d, Bateria calculada: %d mV", raw_val, voltage_mv, battery_mv);
+
+    return battery_mv;
 }
 
 int battery_get_percentage(void)
 {
     int mv = battery_get_voltage_mv();
-    int current_pct = 0;
+    int current_pct;
 
-    // Batería LiPo estándar: 4200mV (100%) - 3000mV (0%)
     if (mv >= 4200) {
         current_pct = 100;
     } else if (mv <= 3000) {
@@ -80,10 +78,11 @@ int battery_get_percentage(void)
         current_pct = ((mv - 3000) * 100) / (4200 - 3000);
     }
 
-    // Filtro: Si es la primera lectura (100) o si el porcentaje bajó, actualizamos el mínimo
-    if (min_battery_pct == 100 || current_pct < min_battery_pct) {
-        min_battery_pct = current_pct;
+    if (smoothed_pct < 0) {
+        smoothed_pct = (float)current_pct;
+    } else {
+        smoothed_pct = smoothed_pct * 0.9f + (float)current_pct * 0.1f;
     }
 
-    return min_battery_pct;
+    return (int)(smoothed_pct + 0.5f);
 }
