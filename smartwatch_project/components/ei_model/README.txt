@@ -1,7 +1,7 @@
 
-# Edge Impulse library for KWS-Proyecto2
+# Edge Impulse library for Baby-Crying-Detection
 
-This is a C++ library that lets you run the impulse for "KWS-Proyecto2" (https://studio.edgeimpulse.com/studio/658898) on any device. It consists of the Edge Impulse inferencing SDK - with implementations of both processing and learning blocks - and your model. You will need to include this library in your project to run your impulse locally.
+This is a C++ library that lets you run the impulse for "Baby-Crying-Detection" (https://studio.edgeimpulse.com/studio/535757) on any device. It consists of the Edge Impulse inferencing SDK - with implementations of both processing and learning blocks - and your model. You will need to include this library in your project to run your impulse locally.
 
 ## Getting Started
 
