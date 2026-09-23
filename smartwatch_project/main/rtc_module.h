@@ -11,4 +11,6 @@ void rtc_get_time_str(char *time_str, size_t max_len);
 
 void rtc_set_time(uint16_t year, uint8_t month, uint8_t day, uint8_t hr, uint8_t min, uint8_t sec);
 
+void rtc_task_start(void);
+
 #endif // RTC_MODULE_H

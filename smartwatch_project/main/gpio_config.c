@@ -40,6 +40,7 @@ void config_init_modules(void)
 
     ei_wrapper_init();
     ai_module_start();
+    rtc_task_start();
 }
 
 void gpio_config_init(void)

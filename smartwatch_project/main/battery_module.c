@@ -12,7 +12,7 @@ static const char *TAG = "battery_module";
 #define BAT_ADC_PIN 0 // GPIO0 es ADC1_CHANNEL_0 en el ESP32-C6
 #define VOLTAGE_DIVIDER_RATIO 3.0f // Multiplicador de hardware de la placa
 #define BATTERY_TASK_PRIORITY   1
-#define BATTERY_UPDATE_MS       10000
+#define BATTERY_UPDATE_MS       (3 * 60 * 1000)
 
 static adc_oneshot_unit_handle_t adc1_handle;
 static adc_cali_handle_t cali_handle;

@@ -1,19 +1,35 @@
 #include "rtc_module.h"
-#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "ui.h"
 #include <stdio.h>
 
-static const char *TAG = "rtc_module";
-#define PCF85063_ADDR 0x51 // Dirección estándar I2C de este chip
+#define PCF85063_ADDR 0x51 
+#define CLOCK_TASK_PRIORITY   1
+#define CLOCK_UPDATE_MS       (1 * 60 * 1000)
 
 static i2c_master_dev_handle_t rtc_dev_handle;
 
-// Funciones para convertir BCD a Decimal
 static uint8_t bcd2dec(uint8_t val) { return ((val / 16 * 10) + (val % 16)); }
 static uint8_t dec2bcd(uint8_t val) { return ((val / 10 * 16) + (val % 10)); }
 
+static void clock_task(void *arg)
+{
+    char time_str[16];
+    while (1) {
+        rtc_get_time_str(time_str, sizeof(time_str));
+        ui_post_clock_msg(time_str);
+        vTaskDelay(pdMS_TO_TICKS(CLOCK_UPDATE_MS));
+    }
+}
+
+void rtc_task_start(void)
+{
+    xTaskCreate(clock_task, "clock_task", 4096, NULL, CLOCK_TASK_PRIORITY, NULL);
+}
+
 void rtc_init(i2c_master_bus_handle_t bus_handle)
 {
-    // Agregamos el dispositivo RTC al bus I2C existente (Nuevo estándar v6.0)
     i2c_device_config_t dev_cfg = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address = PCF85063_ADDR,
@@ -39,7 +55,6 @@ void rtc_get_time_str(char *time_str, size_t max_len)
         snprintf(time_str, max_len, "%02d:%02d:%02d", hr, min, sec);
     } else {
         snprintf(time_str, max_len, "Error RTC");
-        ESP_LOGE(TAG, "Failed to read RTC");
     }
 }
 
@@ -61,10 +76,4 @@ void rtc_set_time(uint16_t year, uint8_t month, uint8_t day, uint8_t hr, uint8_t
     write_data[7] = dec2bcd((uint8_t)year);
 
     esp_err_t err = i2c_master_transmit(rtc_dev_handle, write_data, sizeof(write_data), -1);
-    
-    if (err == ESP_OK) {
-        ESP_LOGI(TAG, "Hora del RTC configurada correctamente");
-    } else {
-        ESP_LOGE(TAG, "Error configurando el RTC");
-    }
 }
