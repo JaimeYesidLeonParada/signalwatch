@@ -3,16 +3,35 @@
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "ui.h"
 
 static const char *TAG = "battery_module";
 
 #define BAT_ADC_PIN 0 // GPIO0 es ADC1_CHANNEL_0 en el ESP32-C6
-#define VOLTAGE_DIVIDER_RATIO 2.43f // Multiplicador de hardware de la placa
+#define VOLTAGE_DIVIDER_RATIO 3.0f // Multiplicador de hardware de la placa
+#define BATTERY_TASK_PRIORITY   1
+#define BATTERY_UPDATE_MS       10000
 
 static adc_oneshot_unit_handle_t adc1_handle;
 static adc_cali_handle_t cali_handle;
 static bool cali_enable = false;
 static float smoothed_pct = -1.0f; // -1 = todavia sin ninguna lectura
+
+static void battery_task(void *arg)
+{
+    while (1) {
+        int bat_pct = battery_get_percentage();
+        ui_post_battery_msg(bat_pct);
+        vTaskDelay(pdMS_TO_TICKS(BATTERY_UPDATE_MS));
+    }
+}
+
+void battery_task_start(void)
+{
+    xTaskCreate(battery_task, "battery_task", 4096, NULL, BATTERY_TASK_PRIORITY, NULL);
+}
 
 void battery_init(void)
 {
@@ -45,6 +64,8 @@ void battery_init(void)
     } else {
         ESP_LOGW(TAG, "Calibración del ADC fallida. Usando valores brutos.");
     }
+
+    battery_task_start();
 }
 
 int battery_get_voltage_mv(void)

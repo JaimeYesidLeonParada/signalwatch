@@ -150,9 +150,17 @@ static void ui_update_battery(int bat_pct)
     if (battery_label == NULL) {
         battery_label = lv_label_create(scr);
         lv_obj_set_style_text_color(battery_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-        lv_obj_align(battery_label, LV_ALIGN_TOP_MID, 0, 90);
+        lv_obj_align(battery_label, LV_ALIGN_TOP_RIGHT, -10, 10);
     }
-    lv_label_set_text_fmt(battery_label, "Bateria: %d%%", bat_pct);
+
+    const char *symbol;
+    if (bat_pct >= 80) symbol = LV_SYMBOL_BATTERY_FULL;
+    else if (bat_pct >= 60) symbol = LV_SYMBOL_BATTERY_3;
+    else if (bat_pct >= 40) symbol = LV_SYMBOL_BATTERY_2;
+    else if (bat_pct >= 15) symbol = LV_SYMBOL_BATTERY_1;
+    else symbol = LV_SYMBOL_BATTERY_EMPTY;
+
+    lv_label_set_text(battery_label, symbol);
 }
 
 static void ui_update_inference(const char *label, float confidence)
