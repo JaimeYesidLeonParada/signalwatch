@@ -3,6 +3,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include <string.h>
+#include <stdbool.h>
 #include "driver/gpio.h"
 #include "lvgl.h"
 #include "esp_lvgl_port.h"
@@ -26,6 +27,7 @@
 
 static lv_obj_t * clock_label = NULL;
 static lv_obj_t * battery_label = NULL;
+static lv_obj_t * usb_label = NULL;
 static lv_obj_t * inference_label = NULL;
 static lv_obj_t * vu_label = NULL;
 static lv_obj_t * vu_bar = NULL;
@@ -44,7 +46,7 @@ typedef struct {
     ui_msg_type_t type;
     union {
         struct { char time_str[16]; } clock;
-        struct { int bat_pct; } battery;
+        struct { int bat_pct; bool is_charging; } battery;
         struct { char label[32]; float confidence; } inference;
         struct { int level; } audio_level;
     } data;
@@ -132,7 +134,7 @@ static void ui_update_clock(const char *time_str)
         clock_label = lv_label_create(scr);
         lv_obj_set_style_text_color(clock_label, lv_color_hex(0x00FF00), LV_PART_MAIN);
         lv_obj_set_style_text_font(clock_label, &lv_font_montserrat_48, LV_PART_MAIN);
-        lv_obj_align(clock_label, LV_ALIGN_TOP_MID, 0, 15);
+        lv_obj_align(clock_label, LV_ALIGN_TOP_MID, 0, 30);
     }
 
     int hr = 0, min = 0, sec = 0;
@@ -144,13 +146,18 @@ static void ui_update_clock(const char *time_str)
     lv_label_set_text_fmt(clock_label, "%d:%02d", hr12, min);
 }
 
-static void ui_update_battery(int bat_pct)
+void ui_update_battery(int bat_pct, bool is_charging)
 {
     lv_obj_t * scr = lv_disp_get_scr_act(disp);
+
     if (battery_label == NULL) {
         battery_label = lv_label_create(scr);
-        lv_obj_set_style_text_color(battery_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-        lv_obj_align(battery_label, LV_ALIGN_TOP_RIGHT, -10, 10);
+        lv_obj_align(battery_label, LV_ALIGN_TOP_RIGHT, -14, 10);
+    }
+    if (usb_label == NULL) {
+        usb_label = lv_label_create(scr);
+        lv_obj_set_style_text_color(usb_label, lv_color_hex(0x00BFFF), LV_PART_MAIN);
+        lv_obj_align_to(usb_label, battery_label, LV_ALIGN_OUT_LEFT_MID, 22, 0);
     }
 
     const char *symbol;
@@ -160,7 +167,11 @@ static void ui_update_battery(int bat_pct)
     else if (bat_pct >= 15) symbol = LV_SYMBOL_BATTERY_1;
     else symbol = LV_SYMBOL_BATTERY_EMPTY;
 
+    lv_color_t color = is_charging ? lv_color_hex(0x00BFFF) : lv_color_hex(0xFFFFFF);
+    lv_obj_set_style_text_color(battery_label, color, LV_PART_MAIN);
     lv_label_set_text(battery_label, symbol);
+
+    lv_label_set_text(usb_label, is_charging ? LV_SYMBOL_USB : "");
 }
 
 static void ui_update_inference(const char *label, float confidence)
@@ -205,7 +216,7 @@ static void ui_task(void *arg)
                     break;
                     
                     case UI_MSG_BATTERY:
-                    ui_update_battery(msg.data.battery.bat_pct);
+                    ui_update_battery(msg.data.battery.bat_pct, msg.data.battery.is_charging);
                     break;
     
                     case UI_MSG_INFERENCE:
@@ -229,9 +240,9 @@ void ui_post_clock_msg(const char *time_str)
     xQueueSend(ui_queue, &msg, 0);
 }
 
-void ui_post_battery_msg(int bat_pct)
+void ui_post_battery_msg(int bat_pct, bool is_charging)
 {
-    ui_msg_t msg = { .type = UI_MSG_BATTERY, .data.battery = { bat_pct } };
+    ui_msg_t msg = { .type = UI_MSG_BATTERY, .data.battery = { bat_pct, is_charging } };
     xQueueSend(ui_queue, &msg, 0);
 }
 
