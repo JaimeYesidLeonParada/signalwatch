@@ -14,7 +14,7 @@ static const char *TAG = "battery_module";
 #define BATTERY_TASK_PRIORITY   1
 #define BATTERY_MAX_VOLTAGE    4140   // Voltaje máximo de la batería (mV)
 #define BATTERY_UPDATE_MS      1000   // 5 segundos
-#define CHARGING_PCT_THRESHOLD   99   // umbral empirico: con USB conectado llega cerca del 100%
+#define CHARGING_PCT_THRESHOLD   98   // umbral empirico: con USB conectado llega cerca del 100%
 
 static adc_oneshot_unit_handle_t adc1_handle;
 static adc_cali_handle_t cali_handle;

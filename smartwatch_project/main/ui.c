@@ -55,6 +55,8 @@ typedef struct {
 static QueueHandle_t ui_queue = NULL;
 static void ui_task(void *arg);
 
+extern const lv_font_t nine_pin_70;
+
 void ui_display_init(void)
 {
     gpio_reset_pin(LCD_BL_PIN);
@@ -133,12 +135,12 @@ static void ui_update_clock(const char *time_str)
     if (clock_label == NULL) {
         clock_label = lv_label_create(scr);
         lv_obj_set_style_text_color(clock_label, lv_color_hex(0x00FF00), LV_PART_MAIN);
-        lv_obj_set_style_text_font(clock_label, &lv_font_montserrat_48, LV_PART_MAIN);
-        lv_obj_align(clock_label, LV_ALIGN_TOP_MID, 0, 30);
+        lv_obj_set_style_text_font(clock_label, &nine_pin_70, LV_PART_MAIN);
+        lv_obj_align(clock_label, LV_ALIGN_TOP_MID, 0, 50);
     }
 
-    int hr = 0, min = 0, sec = 0;
-    sscanf(time_str, "%d:%d:%d", &hr, &min, &sec);
+    int hr = 0, min = 0;
+    sscanf(time_str, "%d:%d", &hr, &min);
 
     int hr12 = hr % 12;
     if (hr12 == 0) hr12 = 12;

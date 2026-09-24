@@ -47,12 +47,10 @@ void rtc_get_time_str(char *time_str, size_t max_len)
     esp_err_t err = i2c_master_transmit_receive(rtc_dev_handle, &reg, 1, rx_data, sizeof(rx_data), -1);
     
     if (err == ESP_OK) {
-        // Limpiamos los bits de estado y convertimos
-        uint8_t sec = bcd2dec(rx_data[0] & 0x7F);
         uint8_t min = bcd2dec(rx_data[1] & 0x7F);
         uint8_t hr  = bcd2dec(rx_data[2] & 0x3F);
         
-        snprintf(time_str, max_len, "%02d:%02d:%02d", hr, min, sec);
+        snprintf(time_str, max_len, "%02d:%02d", hr, min);
     } else {
         snprintf(time_str, max_len, "Error RTC");
     }
