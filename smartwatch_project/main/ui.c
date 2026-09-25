@@ -134,7 +134,7 @@ static void ui_update_clock(const char *time_str)
     lv_obj_t * scr = lv_disp_get_scr_act(disp);
     if (clock_label == NULL) {
         clock_label = lv_label_create(scr);
-        lv_obj_set_style_text_color(clock_label, lv_color_hex(0x00FF00), LV_PART_MAIN);
+        lv_obj_set_style_text_color(clock_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
         lv_obj_set_style_text_font(clock_label, &nine_pin_70, LV_PART_MAIN);
         lv_obj_align(clock_label, LV_ALIGN_TOP_MID, 0, 50);
     }

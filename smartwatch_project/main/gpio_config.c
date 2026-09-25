@@ -9,8 +9,8 @@
 #include "battery_module.h"
 #include "touch_module.h"
 #include "ai_module.h"
+#include "vibrator_module.h"
 
-#define MOTOR_VIBRATOR_PIN 18
 #define BATTERY_ENABLE_PIN 15
 #define I2C_SDA_PIN 8
 #define I2C_SCL_PIN 7
@@ -37,21 +37,18 @@ void config_init_modules(void)
 
     button_init();
     battery_init();
+    vibrator_init();
 
     ei_wrapper_init();
     ai_module_start();
     rtc_task_start();
+    vibrator_task_start();
 }
 
 void gpio_config_init(void)
 {
-    gpio_reset_pin(MOTOR_VIBRATOR_PIN);
-    gpio_set_direction(MOTOR_VIBRATOR_PIN, GPIO_MODE_OUTPUT);
-
     gpio_reset_pin(BATTERY_ENABLE_PIN);
     gpio_set_direction(BATTERY_ENABLE_PIN, GPIO_MODE_OUTPUT);
-
-    gpio_set_level(MOTOR_VIBRATOR_PIN, 0); // Motor apagado
     gpio_set_level(BATTERY_ENABLE_PIN, 1); // Batería habilitada
 
     config_init_modules();
