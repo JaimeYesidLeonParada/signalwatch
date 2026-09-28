@@ -29,8 +29,7 @@ static lv_obj_t * clock_label = NULL;
 static lv_obj_t * battery_label = NULL;
 static lv_obj_t * usb_label = NULL;
 static lv_obj_t * inference_label = NULL;
-static lv_obj_t * vu_label = NULL;
-static lv_obj_t * vu_bar = NULL;
+static lv_obj_t * vu_icon = NULL;
 
 static const char *TAG = "esp32_c6_ui_module";
 lv_disp_t * disp;
@@ -92,7 +91,6 @@ void ui_display_init(void)
     esp_lcd_panel_dev_config_t panel_config = {
         .reset_gpio_num = LCD_RST_PIN,
         .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_BGR,
-        .data_endian = LCD_RGB_DATA_ENDIAN_BIG,
         .bits_per_pixel = 16,
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io_handle, &panel_config, &panel_handle));
@@ -191,19 +189,23 @@ static void ui_update_inference(const char *label, float confidence)
 static void ui_update_vu(int level)
 {
     lv_obj_t * scr = lv_disp_get_scr_act(disp);
-    if (vu_bar == NULL) {
-        vu_label = lv_label_create(scr);
-        lv_obj_set_style_text_color(vu_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-        lv_label_set_text(vu_label, "Volumen");
-        lv_obj_align(vu_label, LV_ALIGN_BOTTOM_MID, 0, -50);
-
-        vu_bar = lv_bar_create(scr);
-        lv_obj_set_size(vu_bar, 180, 20);
-        lv_bar_set_range(vu_bar, 0, 100);
-        lv_obj_set_style_bg_color(vu_bar, lv_color_hex(0x00AAFF), LV_PART_INDICATOR);
-        lv_obj_align(vu_bar, LV_ALIGN_BOTTOM_MID, 0, -20);
+    if (vu_icon == NULL) {
+        vu_icon = lv_label_create(scr);
+        lv_obj_set_style_text_font(vu_icon, &lv_font_montserrat_48, LV_PART_MAIN);
+        lv_obj_set_style_text_color(vu_icon, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        lv_obj_align(vu_icon, LV_ALIGN_BOTTOM_LEFT, 20, -20);
     }
-    lv_bar_set_value(vu_bar, level, LV_ANIM_OFF); // sin animacion, salto instantaneo
+
+    const char *symbol;
+    if (level >= 60) {
+        symbol = LV_SYMBOL_VOLUME_MAX;
+    } else if (level >= 15) {
+        symbol = LV_SYMBOL_VOLUME_MID;
+    } else {
+        symbol = LV_SYMBOL_MUTE;
+    }
+    
+    lv_label_set_text(vu_icon, symbol);
 }
 
 static void ui_task(void *arg)
