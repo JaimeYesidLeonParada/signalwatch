@@ -1,3 +1,6 @@
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
 #include "ai_module.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -6,10 +9,8 @@
 #include "esp_codec_dev.h"
 #include "esp_timer.h"
 #include "ei_wrapper.h"
+#include "vibrator_module.h"
 #include "ui.h"
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
 
 #define AUDIO_BUFFER_SIZE   16000   // 1 s @ 16 kHz (lo que exige el modelo)
 #define CHUNK_SAMPLES       1000
@@ -17,13 +18,13 @@
 
 #define CAPTURE_TASK_PRIORITY    5   // la mas alta: protege el margen del DMA
 #define CLASSIFY_TASK_PRIORITY   0   // la mas baja (idle): nunca bloquea al resto del sistema
-#define SOUND_THRESHOLD   50
+#define SOUND_THRESHOLD   20
 #define PRE_ROLL_CHUNKS   4   // ~250 ms de contexto antes del disparo (AJUSTAR con pruebas)
+#define LOUD_SOUND_THRESHOLD   75
 
 static int16_t preroll_ring[PRE_ROLL_CHUNKS][CHUNK_SAMPLES];
 static int preroll_write_idx = 0;
 static int16_t chunk_scratch[CHUNK_SAMPLES]; // buffer de lectura reutilizable, static para no gastar stack
-
 
 static const char *TAG = "ai_module";
 
@@ -44,6 +45,7 @@ static void audio_capture_task(void *arg) {
     int buf_idx = -1;
     int chunks_filled = 0;
     int64_t fill_start = 0;
+    bool was_loud = false;
 
     while (1) {
         int err = esp_codec_dev_read(input_dev, (void *)chunk_scratch, chunk_bytes);
@@ -54,9 +56,16 @@ static void audio_capture_task(void *arg) {
 
         int64_t sum = 0;
         for (int i = 0; i < CHUNK_SAMPLES; i++) sum += abs(chunk_scratch[i]);
-        int level = (int)((sum / CHUNK_SAMPLES) / 8);
+
+        int level = (int)((sum / CHUNK_SAMPLES) / 20);
         if (level > 100) level = 100;
         ui_post_audio_level_msg(level);
+
+        bool is_loud = (level >= LOUD_SOUND_THRESHOLD);
+        if (is_loud && !was_loud) {
+            vibration_morse_play("I");
+        }
+        was_loud = is_loud;
 
         if (!filling) {
             memcpy(preroll_ring[preroll_write_idx], chunk_scratch, chunk_bytes);

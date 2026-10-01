@@ -146,7 +146,7 @@ static void ui_update_clock(const char *time_str)
     lv_label_set_text_fmt(clock_label, "%d:%02d", hr12, min);
 }
 
-void ui_update_battery(int bat_pct, bool is_charging)
+static void ui_update_battery(int bat_pct, bool is_charging)
 {
     lv_obj_t * scr = lv_disp_get_scr_act(disp);
 
