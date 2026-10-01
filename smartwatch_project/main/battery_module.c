@@ -84,8 +84,7 @@ int battery_get_voltage_mv(void)
     }
 
     int battery_mv = (int)(voltage_mv * VOLTAGE_DIVIDER_RATIO + 0.5f);
-    ESP_LOGI(TAG, "ADC crudo: %d, ADC mV: %d, Bateria calculada: %d mV", raw_val, voltage_mv, battery_mv);
-
+    
     return battery_mv;
 }
 

@@ -4,7 +4,6 @@
 #include "esp_timer.h" 
 #include <stdarg.h>
 #include <stdlib.h>
-#include "ui.h"
 
 static const char *TAG = "edge_ai";
 
@@ -76,40 +75,46 @@ void ei_wrapper_init(void) {
     ESP_LOGI(TAG, "=========================================");
 }
 
-void ei_wrapper_classify(int16_t *audio_buffer, int buffer_size) {
+bool ei_wrapper_classify(int16_t *audio_buffer, int buffer_size, ei_wrapper_result_t *out_result) {
     if (buffer_size < EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE) {
         ESP_LOGE(TAG, "El buffer de audio es muy pequeno. Se esperaban %d muestras.", EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE);
-        return;
+        return false;
     }
 
-    // Asignamos el buffer actual al puntero global
     current_audio_buffer = audio_buffer;
 
-    // Configuramos la estructura de la senal para Edge Impulse
     signal_t signal;
     signal.total_length = EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE;
     signal.get_data = &microphone_audio_signal_get_data;
 
-    // Ejecutamos la inferencia
     ei_impulse_result_t result = { 0 };
     ESP_LOGI(TAG, "Ejecutando inferencia...");
-    
-    // El 'false' al final desactiva el modo debug detallado para ahorrar tiempo
+
     EI_IMPULSE_ERROR err = run_classifier(&signal, &result, false);
-    
     if (err != EI_IMPULSE_OK) {
         ESP_LOGE(TAG, "Fallo al ejecutar el clasificador (%d)", err);
-        return;
+        return false;
     }
 
-    // Imprimimos las predicciones!
     ESP_LOGI(TAG, "Predicciones (Tardo %d ms):", result.timing.classification);
+
+    int count = EI_CLASSIFIER_LABEL_COUNT;
+    if (count > EI_WRAPPER_MAX_LABELS) count = EI_WRAPPER_MAX_LABELS; // proteccion si el modelo crece
+
     size_t best_ix = 0;
-    for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
+    for (int ix = 0; ix < count; ix++) {
         ESP_LOGI(TAG, "    %s: %.5f", result.classification[ix].label, result.classification[ix].value);
         if (result.classification[ix].value > result.classification[best_ix].value) {
             best_ix = ix;
         }
+        strncpy(out_result->classifications[ix].label, result.classification[ix].label,
+                sizeof(out_result->classifications[ix].label) - 1);
+        out_result->classifications[ix].confidence = result.classification[ix].value;
     }
-    ui_post_inference_msg(result.classification[best_ix].label, result.classification[best_ix].value);
+
+    out_result->count = count;
+    out_result->best_index = (int)best_ix;
+    out_result->timing_ms = result.timing.classification;
+
+    return true;
 }

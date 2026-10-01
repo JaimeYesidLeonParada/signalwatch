@@ -10,6 +10,7 @@
 #include "esp_timer.h"
 #include "ei_wrapper.h"
 #include "vibrator_module.h"
+#include "alert_module.h"
 #include "ui.h"
 
 #define AUDIO_BUFFER_SIZE   16000   // 1 s @ 16 kHz (lo que exige el modelo)
@@ -104,7 +105,18 @@ static void audio_classify_task(void *arg) {
         int buf_idx;
         xQueueReceive(buffer_ready_queue, &buf_idx, portMAX_DELAY);
 
-        ei_wrapper_classify(audio_buffers[buf_idx], AUDIO_BUFFER_SIZE);
+        ei_wrapper_result_t result;
+        if (ei_wrapper_classify(audio_buffers[buf_idx], AUDIO_BUFFER_SIZE, &result)) {
+            ui_post_inference_msg(result.classifications[result.best_index].label,
+                                   result.classifications[result.best_index].confidence);
+
+            static const char *ALERT_LEVEL_NAMES[] = { "NONE", "LOW", "MEDIUM", "HIGH" };
+            for (int i = 0; i < result.count; i++) {
+                alert_level_t lvl = alert_module_add_sample(result.classifications[i].label,
+                                                             result.classifications[i].confidence);
+                ESP_LOGI(TAG, "    %s -> nivel post-procesado: %s", result.classifications[i].label, ALERT_LEVEL_NAMES[lvl]);
+            }
+        }
 
         xQueueSend(buffer_free_queue, &buf_idx, portMAX_DELAY);
     }
