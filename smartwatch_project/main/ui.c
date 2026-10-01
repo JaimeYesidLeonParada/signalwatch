@@ -30,6 +30,9 @@ static lv_obj_t * battery_label = NULL;
 static lv_obj_t * usb_label = NULL;
 static lv_obj_t * inference_label = NULL;
 static lv_obj_t * vu_icon = NULL;
+static lv_obj_t * ambulance_icon = NULL;
+static lv_obj_t * baby_icon = NULL;
+static lv_obj_t * fire_icon = NULL;
 
 static const char *TAG = "esp32_c6_ui_module";
 lv_disp_t * disp;
@@ -55,6 +58,11 @@ static QueueHandle_t ui_queue = NULL;
 static void ui_task(void *arg);
 
 extern const lv_font_t nine_pin_70;
+extern const lv_font_t fa_icons_32;
+
+#define ICON_AMBULANCE "\xEF\x83\xB9"
+#define ICON_BABY "\xEF\x9D\xBC"
+#define ICON_FIRE "\xEF\x81\xAD"
 
 void ui_display_init(void)
 {
@@ -191,9 +199,27 @@ static void ui_update_vu(int level)
     lv_obj_t * scr = lv_disp_get_scr_act(disp);
     if (vu_icon == NULL) {
         vu_icon = lv_label_create(scr);
-        lv_obj_set_style_text_font(vu_icon, &lv_font_montserrat_48, LV_PART_MAIN);
+        lv_obj_set_style_text_font(vu_icon, &lv_font_montserrat_44, LV_PART_MAIN);
         lv_obj_set_style_text_color(vu_icon, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-        lv_obj_align(vu_icon, LV_ALIGN_BOTTOM_LEFT, 20, -20);
+        lv_obj_align(vu_icon, LV_ALIGN_BOTTOM_LEFT, 15, -20);
+
+        ambulance_icon = lv_label_create(scr);
+        lv_obj_set_style_text_font(ambulance_icon, &fa_icons_32, LV_PART_MAIN);
+        lv_obj_set_style_text_color(ambulance_icon, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        lv_label_set_text(ambulance_icon, ICON_AMBULANCE);
+        lv_obj_align_to(ambulance_icon, vu_icon, LV_ALIGN_OUT_RIGHT_MID, -35, 0);
+
+        baby_icon = lv_label_create(scr);
+        lv_obj_set_style_text_font(baby_icon, &fa_icons_32, LV_PART_MAIN);
+        lv_obj_set_style_text_color(baby_icon, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        lv_label_set_text(baby_icon, ICON_BABY);
+        lv_obj_align_to(baby_icon, ambulance_icon, LV_ALIGN_OUT_RIGHT_MID, 30, 0);
+
+        fire_icon = lv_label_create(scr);
+        lv_obj_set_style_text_font(fire_icon, &fa_icons_32, LV_PART_MAIN);
+        lv_obj_set_style_text_color(fire_icon, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        lv_label_set_text(fire_icon, ICON_FIRE);
+        lv_obj_align_to(fire_icon, baby_icon, LV_ALIGN_OUT_RIGHT_MID, 30, 0);
     }
 
     const char *symbol;
