@@ -19,13 +19,28 @@
 
 #define CAPTURE_TASK_PRIORITY    5   // la mas alta: protege el margen del DMA
 #define CLASSIFY_TASK_PRIORITY   0   // la mas baja (idle): nunca bloquea al resto del sistema
-#define SOUND_THRESHOLD   18
+#define SOUND_THRESHOLD   16
 #define PRE_ROLL_CHUNKS   4   // ~250 ms de contexto antes del disparo (AJUSTAR con pruebas)
 #define LOUD_SOUND_THRESHOLD   90
 
 static int16_t preroll_ring[PRE_ROLL_CHUNKS][CHUNK_SAMPLES];
 static int preroll_write_idx = 0;
 static int16_t chunk_scratch[CHUNK_SAMPLES]; // buffer de lectura reutilizable, static para no gastar stack
+
+static const struct { const char *label; const char *morse; } ALERT_MORSE[] = {
+    { "ambulance",   "A" },
+    { "baby-crying", "B" },
+    { "fire",        "F" },
+};
+#define ALERT_MORSE_COUNT (sizeof(ALERT_MORSE) / sizeof(ALERT_MORSE[0]))
+
+static const char *morse_for_alert_label(const char *label)
+{
+    for (size_t i = 0; i < ALERT_MORSE_COUNT; i++) {
+        if (strcmp(ALERT_MORSE[i].label, label) == 0) return ALERT_MORSE[i].morse;
+    }
+    return NULL;
+}
 
 static const char *TAG = "ai_module";
 
@@ -116,6 +131,13 @@ static void audio_classify_task(void *arg) {
                                                              result.classifications[i].confidence);
                 ESP_LOGI(TAG, "    %s -> nivel post-procesado: %s", result.classifications[i].label, ALERT_LEVEL_NAMES[lvl]);
                 ui_post_alert_icon_msg(result.classifications[i].label, (int)lvl);
+
+                if (lvl == ALERT_HIGH || lvl == ALERT_MEDIUM) {
+                    const char *morse = morse_for_alert_label(result.classifications[i].label);
+                    if (morse != NULL) {
+                        vibration_morse_play(morse);
+                    }
+                }    
             }
         }
 
