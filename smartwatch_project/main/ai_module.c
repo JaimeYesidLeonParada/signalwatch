@@ -19,9 +19,9 @@
 
 #define CAPTURE_TASK_PRIORITY    5   // la mas alta: protege el margen del DMA
 #define CLASSIFY_TASK_PRIORITY   0   // la mas baja (idle): nunca bloquea al resto del sistema
-#define SOUND_THRESHOLD   20
+#define SOUND_THRESHOLD   18
 #define PRE_ROLL_CHUNKS   4   // ~250 ms de contexto antes del disparo (AJUSTAR con pruebas)
-#define LOUD_SOUND_THRESHOLD   75
+#define LOUD_SOUND_THRESHOLD   90
 
 static int16_t preroll_ring[PRE_ROLL_CHUNKS][CHUNK_SAMPLES];
 static int preroll_write_idx = 0;
@@ -115,6 +115,7 @@ static void audio_classify_task(void *arg) {
                 alert_level_t lvl = alert_module_add_sample(result.classifications[i].label,
                                                              result.classifications[i].confidence);
                 ESP_LOGI(TAG, "    %s -> nivel post-procesado: %s", result.classifications[i].label, ALERT_LEVEL_NAMES[lvl]);
+                ui_post_alert_icon_msg(result.classifications[i].label, (int)lvl);
             }
         }
 

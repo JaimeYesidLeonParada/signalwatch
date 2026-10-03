@@ -42,6 +42,7 @@ typedef enum {
     UI_MSG_BATTERY,
     UI_MSG_INFERENCE,
     UI_MSG_AUDIO_LEVEL,
+    UI_MSG_ALERT_ICON,
 } ui_msg_type_t;
 
 typedef struct {
@@ -51,8 +52,10 @@ typedef struct {
         struct { int bat_pct; bool is_charging; } battery;
         struct { char label[32]; float confidence; } inference;
         struct { int level; } audio_level;
+        struct { char label[32]; int level; } alert_icon;
     } data;
 } ui_msg_t;
+
 
 static QueueHandle_t ui_queue = NULL;
 static void ui_task(void *arg);
@@ -63,6 +66,59 @@ extern const lv_font_t fa_icons_32;
 #define ICON_AMBULANCE "\xEF\x83\xB9"
 #define ICON_BABY "\xEF\x9D\xBC"
 #define ICON_FIRE "\xEF\x81\xAD"
+
+static void set_alert_icon_style(lv_obj_t *icon, int level)
+{
+    switch (level) {
+        case 3: // HIGH
+            lv_obj_set_style_text_color(icon, lv_color_hex(0xFF0000), LV_PART_MAIN);
+            lv_obj_set_style_text_opa(icon, LV_OPA_COVER, LV_PART_MAIN);
+            break;
+        case 2: // MEDIUM
+            lv_obj_set_style_text_color(icon, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+            lv_obj_set_style_text_opa(icon, LV_OPA_COVER, LV_PART_MAIN);
+            break;
+        case 1: // LOW
+            lv_obj_set_style_text_color(icon, lv_color_hex(0x660066), LV_PART_MAIN);
+            lv_obj_set_style_text_opa(icon, LV_OPA_COVER, LV_PART_MAIN);
+            break;
+        default: // NONE - a la escucha
+            lv_obj_set_style_text_color(icon, lv_color_hex(0x660066), LV_PART_MAIN);
+            lv_obj_set_style_text_opa(icon, LV_OPA_10, LV_PART_MAIN);
+            break;
+    }
+}
+
+void ui_alert_icon_init(void)
+{
+    lv_obj_t * scr = lv_disp_get_scr_act(disp);
+
+    vu_icon = lv_label_create(scr);
+    lv_obj_set_style_text_font(vu_icon, &lv_font_montserrat_38, LV_PART_MAIN);
+    lv_obj_set_style_text_color(vu_icon, lv_color_hex(0x00FFBB), LV_PART_MAIN);
+    lv_obj_align(vu_icon, LV_ALIGN_BOTTOM_LEFT, 10, -20);
+    
+    ambulance_icon = lv_label_create(scr);
+    lv_obj_set_style_text_font(ambulance_icon, &fa_icons_32, LV_PART_MAIN);
+    lv_obj_set_style_text_color(ambulance_icon, lv_color_hex(0x660066), LV_PART_MAIN);
+     lv_obj_set_style_text_opa(ambulance_icon, LV_OPA_10, LV_PART_MAIN);
+    lv_label_set_text(ambulance_icon, ICON_AMBULANCE);
+    lv_obj_align_to(ambulance_icon, vu_icon, LV_ALIGN_OUT_RIGHT_MID, -20, 0);
+
+    baby_icon = lv_label_create(scr);
+    lv_obj_set_style_text_font(baby_icon, &fa_icons_32, LV_PART_MAIN);
+    lv_obj_set_style_text_color(baby_icon, lv_color_hex(0x660066), LV_PART_MAIN);
+    lv_obj_set_style_text_opa(baby_icon, LV_OPA_10, LV_PART_MAIN);
+    lv_label_set_text(baby_icon, ICON_BABY);
+    lv_obj_align_to(baby_icon, ambulance_icon, LV_ALIGN_OUT_RIGHT_MID, 35, 0);
+
+    fire_icon = lv_label_create(scr);
+    lv_obj_set_style_text_font(fire_icon, &fa_icons_32, LV_PART_MAIN);
+    lv_obj_set_style_text_color(fire_icon, lv_color_hex(0x660066), LV_PART_MAIN);
+    lv_obj_set_style_text_opa(fire_icon, LV_OPA_10, LV_PART_MAIN);
+    lv_label_set_text(fire_icon, ICON_FIRE);
+    lv_obj_align_to(fire_icon, baby_icon, LV_ALIGN_OUT_RIGHT_MID, 35, 0);
+}
 
 void ui_display_init(void)
 {
@@ -130,6 +186,7 @@ void ui_display_init(void)
     disp = lvgl_port_add_disp(&disp_cfg);
 
     lv_obj_set_style_bg_color(lv_disp_get_scr_act(disp), lv_color_hex(0x000000), LV_PART_MAIN);
+    ui_alert_icon_init();
 
     ui_queue = xQueueCreate(5, sizeof(ui_msg_t));
     xTaskCreate(ui_task, "ui_task", 4096, NULL, 4, NULL);
@@ -196,32 +253,6 @@ static void ui_update_inference(const char *label, float confidence)
 
 static void ui_update_vu(int level)
 {
-    lv_obj_t * scr = lv_disp_get_scr_act(disp);
-    if (vu_icon == NULL) {
-        vu_icon = lv_label_create(scr);
-        lv_obj_set_style_text_font(vu_icon, &lv_font_montserrat_44, LV_PART_MAIN);
-        lv_obj_set_style_text_color(vu_icon, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-        lv_obj_align(vu_icon, LV_ALIGN_BOTTOM_LEFT, 15, -20);
-
-        ambulance_icon = lv_label_create(scr);
-        lv_obj_set_style_text_font(ambulance_icon, &fa_icons_32, LV_PART_MAIN);
-        lv_obj_set_style_text_color(ambulance_icon, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-        lv_label_set_text(ambulance_icon, ICON_AMBULANCE);
-        lv_obj_align_to(ambulance_icon, vu_icon, LV_ALIGN_OUT_RIGHT_MID, -35, 0);
-
-        baby_icon = lv_label_create(scr);
-        lv_obj_set_style_text_font(baby_icon, &fa_icons_32, LV_PART_MAIN);
-        lv_obj_set_style_text_color(baby_icon, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-        lv_label_set_text(baby_icon, ICON_BABY);
-        lv_obj_align_to(baby_icon, ambulance_icon, LV_ALIGN_OUT_RIGHT_MID, 30, 0);
-
-        fire_icon = lv_label_create(scr);
-        lv_obj_set_style_text_font(fire_icon, &fa_icons_32, LV_PART_MAIN);
-        lv_obj_set_style_text_color(fire_icon, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-        lv_label_set_text(fire_icon, ICON_FIRE);
-        lv_obj_align_to(fire_icon, baby_icon, LV_ALIGN_OUT_RIGHT_MID, 30, 0);
-    }
-
     const char *symbol;
     if (level >= 60) {
         symbol = LV_SYMBOL_VOLUME_MAX;
@@ -232,6 +263,18 @@ static void ui_update_vu(int level)
     }
     
     lv_label_set_text(vu_icon, symbol);
+}
+
+static void ui_update_alert_icon(const char *label, int level)
+{
+    lv_obj_t *target = NULL;
+    if (strcmp(label, "ambulance") == 0) target = ambulance_icon;
+    else if (strcmp(label, "baby-crying") == 0) target = baby_icon;
+    else if (strcmp(label, "fire") == 0) target = fire_icon;
+
+    if (target != NULL) {
+       set_alert_icon_style(target, level);
+    }
 }
 
 static void ui_task(void *arg)
@@ -255,6 +298,10 @@ static void ui_task(void *arg)
 
                     case UI_MSG_AUDIO_LEVEL:
                     ui_update_vu(msg.data.audio_level.level);
+                    break;
+
+                    case UI_MSG_ALERT_ICON:
+                    ui_update_alert_icon(msg.data.alert_icon.label, msg.data.alert_icon.level);
                     break;
                 }
                 lvgl_port_unlock();
@@ -287,5 +334,13 @@ void ui_post_inference_msg(const char *label, float confidence)
 void ui_post_audio_level_msg(int level_pct)
 {
     ui_msg_t msg = { .type = UI_MSG_AUDIO_LEVEL, .data.audio_level = { level_pct } };
+    xQueueSend(ui_queue, &msg, 0);
+}
+
+void ui_post_alert_icon_msg(const char *label, int level)
+{
+    ui_msg_t msg = { .type = UI_MSG_ALERT_ICON };
+    strncpy(msg.data.alert_icon.label, label, sizeof(msg.data.alert_icon.label) - 1);
+    msg.data.alert_icon.level = level;
     xQueueSend(ui_queue, &msg, 0);
 }
