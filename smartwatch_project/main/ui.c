@@ -26,6 +26,7 @@
 #define LCD_V_RES       280
 
 static lv_obj_t * clock_label = NULL;
+static lv_obj_t * date_label = NULL;
 static lv_obj_t * battery_label = NULL;
 static lv_obj_t * usb_label = NULL;
 static lv_obj_t * inference_label = NULL;
@@ -48,7 +49,7 @@ typedef enum {
 typedef struct {
     ui_msg_type_t type;
     union {
-        struct { char time_str[16]; } clock;
+        struct { char time_str[16]; char date_str[16]; } clock;
         struct { int bat_pct; bool is_charging; } battery;
         struct { char label[32]; float confidence; } inference;
         struct { int level; } audio_level;
@@ -192,7 +193,7 @@ void ui_display_init(void)
     xTaskCreate(ui_task, "ui_task", 4096, NULL, 4, NULL);
 }
 
-static void ui_update_clock(const char *time_str)
+static void ui_update_clock(const char *time_str, const char *date_str)
 {
     lv_obj_t * scr = lv_disp_get_scr_act(disp);
     if (clock_label == NULL) {
@@ -202,6 +203,13 @@ static void ui_update_clock(const char *time_str)
         lv_obj_align(clock_label, LV_ALIGN_TOP_MID, 0, 50);
     }
 
+    if (date_label == NULL) {
+        date_label = lv_label_create(scr);
+        lv_obj_set_style_text_color(date_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        //lv_obj_align_to(date_label, clock_label, LV_ALIGN_OUT_BOTTOM_MID, -20, 15);
+        lv_obj_align(date_label, LV_ALIGN_TOP_LEFT, 10, 10);
+    }
+
     int hr = 0, min = 0;
     sscanf(time_str, "%d:%d", &hr, &min);
 
@@ -209,6 +217,7 @@ static void ui_update_clock(const char *time_str)
     if (hr12 == 0) hr12 = 12;
 
     lv_label_set_text_fmt(clock_label, "%d:%02d", hr12, min);
+    lv_label_set_text(date_label, date_str);
 }
 
 static void ui_update_battery(int bat_pct, bool is_charging)
@@ -245,7 +254,7 @@ static void ui_update_inference(const char *label, float confidence)
     if (inference_label == NULL) {
         inference_label = lv_label_create(scr);
         lv_obj_set_style_text_color(inference_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-        lv_obj_align(inference_label, LV_ALIGN_TOP_MID, 0, 125);
+        lv_obj_align(inference_label, LV_ALIGN_TOP_MID, 0, 150);
     }
     int pct = (int)(confidence * 100.0f + 0.5f); // redondeo
     lv_label_set_text_fmt(inference_label, "%s: %d%%", label, pct);
@@ -285,7 +294,7 @@ static void ui_task(void *arg)
             if (lvgl_port_lock(-1)) {
                 switch (msg.type) {
                     case UI_MSG_CLOCK:
-                    ui_update_clock(msg.data.clock.time_str);
+                    ui_update_clock(msg.data.clock.time_str, msg.data.clock.date_str);
                     break;
                     
                     case UI_MSG_BATTERY:
@@ -310,10 +319,11 @@ static void ui_task(void *arg)
     }
 }
 
-void ui_post_clock_msg(const char *time_str)
+void ui_post_clock_msg(const char *time_str, const char *date_str)
 {
     ui_msg_t msg = { .type = UI_MSG_CLOCK };
     strncpy(msg.data.clock.time_str, time_str, sizeof(msg.data.clock.time_str) - 1);
+    strncpy(msg.data.clock.date_str, date_str, sizeof(msg.data.clock.date_str) - 1);
     xQueueSend(ui_queue, &msg, 0);
 }
 

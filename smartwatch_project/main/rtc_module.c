@@ -16,9 +16,10 @@ static uint8_t dec2bcd(uint8_t val) { return ((val / 10 * 16) + (val % 10)); }
 static void clock_task(void *arg)
 {
     char time_str[16];
+    char date_str[16];
     while (1) {
-        rtc_get_time_str(time_str, sizeof(time_str));
-        ui_post_clock_msg(time_str);
+        rtc_get_time_str(time_str, sizeof(time_str), date_str, sizeof(date_str));
+        ui_post_clock_msg(time_str, date_str);
         vTaskDelay(pdMS_TO_TICKS(CLOCK_UPDATE_MS));
     }
 }
@@ -38,7 +39,7 @@ void rtc_init(i2c_master_bus_handle_t bus_handle)
     ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_cfg, &rtc_dev_handle));
 }
 
-void rtc_get_time_str(char *time_str, size_t max_len)
+void rtc_get_time_str(char *time_str, size_t time_len, char *date_str, size_t date_len)
 {
     uint8_t rx_data[7];
     uint8_t reg = 0x04; // Registro 0x04: Empiezan los segundos
@@ -47,12 +48,18 @@ void rtc_get_time_str(char *time_str, size_t max_len)
     esp_err_t err = i2c_master_transmit_receive(rtc_dev_handle, &reg, 1, rx_data, sizeof(rx_data), -1);
     
     if (err == ESP_OK) {
-        uint8_t min = bcd2dec(rx_data[1] & 0x7F);
-        uint8_t hr  = bcd2dec(rx_data[2] & 0x3F);
-        
-        snprintf(time_str, max_len, "%02d:%02d", hr, min);
+        uint8_t sec   = bcd2dec(rx_data[0] & 0x7F);
+        uint8_t min   = bcd2dec(rx_data[1] & 0x7F);
+        uint8_t hr    = bcd2dec(rx_data[2] & 0x3F);
+        uint8_t day   = bcd2dec(rx_data[3] & 0x3F);
+        uint8_t month = bcd2dec(rx_data[5] & 0x1F);
+        uint8_t year  = bcd2dec(rx_data[6]);
+
+        snprintf(time_str, time_len, "%02d:%02d:%02d", hr, min, sec);
+        snprintf(date_str, date_len, "%02d %02d 20%02d", day, month, year);
     } else {
-        snprintf(time_str, max_len, "Error RTC");
+        snprintf(time_str, time_len, "Error RTC");
+        snprintf(date_str, date_len, "");
     }
 }
 
