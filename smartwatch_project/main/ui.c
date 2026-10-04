@@ -200,13 +200,12 @@ static void ui_update_clock(const char *time_str, const char *date_str)
         clock_label = lv_label_create(scr);
         lv_obj_set_style_text_color(clock_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
         lv_obj_set_style_text_font(clock_label, &nine_pin_70, LV_PART_MAIN);
-        lv_obj_align(clock_label, LV_ALIGN_TOP_MID, 0, 50);
+        lv_obj_align(clock_label, LV_ALIGN_TOP_MID, 0, 60);
     }
 
     if (date_label == NULL) {
         date_label = lv_label_create(scr);
         lv_obj_set_style_text_color(date_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-        //lv_obj_align_to(date_label, clock_label, LV_ALIGN_OUT_BOTTOM_MID, -20, 15);
         lv_obj_align(date_label, LV_ALIGN_TOP_LEFT, 10, 10);
     }
 

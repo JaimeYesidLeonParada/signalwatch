@@ -12,6 +12,9 @@ static i2c_master_dev_handle_t rtc_dev_handle;
 
 static uint8_t bcd2dec(uint8_t val) { return ((val / 16 * 10) + (val % 16)); }
 static uint8_t dec2bcd(uint8_t val) { return ((val / 10 * 16) + (val % 10)); }
+static const char *const DAY_NAMES[]   = {"Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"};
+static const char *const MONTH_NAMES[] = {"Ene", "Feb", "Mar", "Abr", "May", "Jun",
+                                          "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"};
 
 static void clock_task(void *arg)
 {
@@ -52,18 +55,19 @@ void rtc_get_time_str(char *time_str, size_t time_len, char *date_str, size_t da
         uint8_t min   = bcd2dec(rx_data[1] & 0x7F);
         uint8_t hr    = bcd2dec(rx_data[2] & 0x3F);
         uint8_t day   = bcd2dec(rx_data[3] & 0x3F);
+        uint8_t dow   = bcd2dec(rx_data[4] & 0x3F);
         uint8_t month = bcd2dec(rx_data[5] & 0x1F);
         uint8_t year  = bcd2dec(rx_data[6]);
 
         snprintf(time_str, time_len, "%02d:%02d:%02d", hr, min, sec);
-        snprintf(date_str, date_len, "%02d %02d 20%02d", day, month, year);
+        snprintf(date_str, date_len, "%s %d %s", DAY_NAMES[dow], day, MONTH_NAMES[month - 1]);
     } else {
         snprintf(time_str, time_len, "Error RTC");
         snprintf(date_str, date_len, "");
     }
 }
 
-void rtc_set_time(uint16_t year, uint8_t month, uint8_t day, uint8_t hr, uint8_t min, uint8_t sec)
+void rtc_set_time(uint16_t year, uint8_t month, uint8_t day, uint8_t dow, uint8_t hr, uint8_t min, uint8_t sec)
 {
     // El PCF85063 guarda el año de 0 a 99
     if (year >= 2000) year -= 2000;
@@ -76,7 +80,7 @@ void rtc_set_time(uint16_t year, uint8_t month, uint8_t day, uint8_t hr, uint8_t
     write_data[2] = dec2bcd(min);
     write_data[3] = dec2bcd(hr);
     write_data[4] = dec2bcd(day);
-    write_data[5] = 0; // Día de la semana (se puede dejar en 0 por ahora)
+    write_data[5] = dec2bcd(dow);
     write_data[6] = dec2bcd(month);
     write_data[7] = dec2bcd((uint8_t)year);
 
