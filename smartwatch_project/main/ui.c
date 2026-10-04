@@ -29,7 +29,7 @@ static lv_obj_t * clock_label = NULL;
 static lv_obj_t * date_label = NULL;
 static lv_obj_t * battery_label = NULL;
 static lv_obj_t * usb_label = NULL;
-static lv_obj_t * inference_label = NULL;
+static lv_obj_t * notification_label = NULL;
 static lv_obj_t * vu_icon = NULL;
 static lv_obj_t * ambulance_icon = NULL;
 static lv_obj_t * baby_icon = NULL;
@@ -44,6 +44,7 @@ typedef enum {
     UI_MSG_INFERENCE,
     UI_MSG_AUDIO_LEVEL,
     UI_MSG_ALERT_ICON,
+    UI_MSG_NOTIFICATION,
 } ui_msg_type_t;
 
 typedef struct {
@@ -54,6 +55,7 @@ typedef struct {
         struct { char label[32]; float confidence; } inference;
         struct { int level; } audio_level;
         struct { char label[32]; int level; } alert_icon;
+        struct { char notification[48];} notification;
     } data;
 } ui_msg_t;
 
@@ -250,13 +252,24 @@ static void ui_update_battery(int bat_pct, bool is_charging)
 static void ui_update_inference(const char *label, float confidence)
 {
     lv_obj_t * scr = lv_disp_get_scr_act(disp);
-    if (inference_label == NULL) {
-        inference_label = lv_label_create(scr);
-        lv_obj_set_style_text_color(inference_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-        lv_obj_align(inference_label, LV_ALIGN_TOP_MID, 0, 150);
+     if (notification_label == NULL) {
+        notification_label = lv_label_create(scr);
+        lv_obj_set_style_text_color(notification_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        lv_obj_align(notification_label, LV_ALIGN_CENTER, 0, 150);
     }
     int pct = (int)(confidence * 100.0f + 0.5f); // redondeo
-    lv_label_set_text_fmt(inference_label, "%s: %d%%", label, pct);
+    lv_label_set_text_fmt(notification_label, "%s: %d%%", label, pct);
+}
+
+static void ui_update_notification(const char *text)
+{
+    lv_obj_t * scr = lv_disp_get_scr_act(disp);
+    if (notification_label == NULL) {
+        notification_label = lv_label_create(scr);
+        lv_obj_set_style_text_color(notification_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        lv_obj_align(notification_label, LV_ALIGN_CENTER, 0, 15);
+    }
+    lv_label_set_text(notification_label, text);
 }
 
 static void ui_update_vu(int level)
@@ -311,11 +324,23 @@ static void ui_task(void *arg)
                     case UI_MSG_ALERT_ICON:
                     ui_update_alert_icon(msg.data.alert_icon.label, msg.data.alert_icon.level);
                     break;
+
+                    case UI_MSG_NOTIFICATION:
+                    ui_update_notification(msg.data.notification.notification);
+                    break;
                 }
                 lvgl_port_unlock();
             }
         }
     }
+}
+
+
+void ui_post_notification_msg(const char *text)
+{
+    ui_msg_t msg = { .type = UI_MSG_NOTIFICATION };
+    strncpy(msg.data.notification.notification, text, sizeof(msg.data.notification.notification) - 1);
+    xQueueSend(ui_queue, &msg, 0);
 }
 
 void ui_post_clock_msg(const char *time_str, const char *date_str)

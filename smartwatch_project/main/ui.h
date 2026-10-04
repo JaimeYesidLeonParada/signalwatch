@@ -11,7 +11,8 @@ void ui_post_clock_msg(const char *time_str, const char *date_str);
 void ui_post_battery_msg(int bat_pct, bool is_charging);
 void ui_post_inference_msg(const char *label, float confidence);
 void ui_post_audio_level_msg(int level_pct);
-void ui_post_alert_icon_msg(const char *label, int level); // level: 0=NONE, 1=LOW, 2=MEDIUM, 3=HIGH
+void ui_post_alert_icon_msg(const char *label, int level); 
+void ui_post_notification_msg(const char *text);
 
 #ifdef __cplusplus
 }

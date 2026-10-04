@@ -80,6 +80,7 @@ static void audio_capture_task(void *arg) {
         bool is_loud = (level >= LOUD_SOUND_THRESHOLD);
         if (is_loud && !was_loud) {
             vibration_morse_play("I");
+            ui_post_notification_msg("Ruido fuerte cerca!");
         }
         was_loud = is_loud;
 
