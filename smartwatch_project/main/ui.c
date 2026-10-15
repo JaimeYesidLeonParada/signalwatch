@@ -59,9 +59,27 @@ typedef struct {
     } data;
 } ui_msg_t;
 
+typedef struct {
+    const char *label;
+    const char *msg[3];   // [0]=LOW, [1]=MEDIUM, [2]=HIGH
+    int prev_level;
+} alert_msg_t;
+
+static alert_msg_t alert_msgs[] = {
+    { "ambulance",   { "Posible ambulancia cerca",
+                       "Parece que viene una ambulancia",
+                       "Alerta! Ambulancia cerca" }, 0 },
+    { "baby-crying", { "Posible llanto de bebe",
+                       "Parece que un bebe esta llorando",
+                       "Alerta! Bebe llorando" }, 0 },
+    { "fire",        { "Posible alarma de fuego",
+                       "Parece que suena una alarma de fuego",
+                       "Alerta! Alarma de fuego" }, 0 },
+};
 
 static QueueHandle_t ui_queue = NULL;
 static void ui_task(void *arg);
+static void ui_update_notification(const char *text);
 
 extern const lv_font_t nine_pin_70;
 extern const lv_font_t fa_icons_32;
@@ -69,6 +87,19 @@ extern const lv_font_t fa_icons_32;
 #define ICON_AMBULANCE "\xEF\x83\xB9"
 #define ICON_BABY "\xEF\x9D\xBC"
 #define ICON_FIRE "\xEF\x81\xAD"
+
+static void update_alert_text(const char *label, int level)
+{
+    for (size_t i = 0; i < sizeof(alert_msgs) / sizeof(alert_msgs[0]); i++) {
+        alert_msg_t *m = &alert_msgs[i];
+        if (strcmp(m->label, label) != 0) continue;
+        if (level == m->prev_level) return;   // el nivel no cambio
+        m->prev_level = level;
+        if (level >= 1 && level <= 3) ui_update_notification(m->msg[level - 1]);
+        else                          ui_update_notification("");
+        return;
+    }
+}
 
 static void set_alert_icon_style(lv_obj_t *icon, int level)
 {
@@ -298,6 +329,7 @@ static void ui_update_alert_icon(const char *label, int level)
 
     if (target != NULL) {
        set_alert_icon_style(target, level);
+       update_alert_text(label, level);
     }
 }
 

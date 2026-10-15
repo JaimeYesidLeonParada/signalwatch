@@ -3,11 +3,11 @@
 #include <stdbool.h>
 
 #define ALERT_MAX_LABELS     8
-#define ALERT_WINDOW_SIZE    4
+#define ALERT_WINDOW_SIZE    3
 
-#define ALERT_THRESHOLD_LOW     0.6f
-#define ALERT_THRESHOLD_MEDIUM  0.7f
-#define ALERT_THRESHOLD_HIGH    0.8f
+#define ALERT_THRESHOLD_LOW     0.5f
+#define ALERT_THRESHOLD_MEDIUM  0.6f
+#define ALERT_THRESHOLD_HIGH    0.7f
 
 typedef struct {
     char label[32];

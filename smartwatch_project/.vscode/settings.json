@@ -22,7 +22,6 @@
   "idf.openOcdConfigs": [
     "board/esp32c6-builtin.cfg"
   ],
-  "idf.portWin": "COM15",
   "idf.currentSetup": "C:\\esp\\v6.0\\esp-idf",
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32c6"
@@ -33,5 +32,6 @@
     "--query-driver=**",
     "--compile-commands-dir=c:\\Users\\ingen\\Documents\\ESP\\esp32_c6\\smartwatch\\smartwatch_project\\build"
   ],
-  "idf.flashType": "UART"
+  "idf.flashType": "UART",
+  "idf.port": "COM15"
 }

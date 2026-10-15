@@ -19,7 +19,7 @@
 
 #define CAPTURE_TASK_PRIORITY    5   // la mas alta: protege el margen del DMA
 #define CLASSIFY_TASK_PRIORITY   0   // la mas baja (idle): nunca bloquea al resto del sistema
-#define SOUND_THRESHOLD   16
+#define SOUND_THRESHOLD   15
 #define PRE_ROLL_CHUNKS   4   // ~250 ms de contexto antes del disparo (AJUSTAR con pruebas)
 #define LOUD_SOUND_THRESHOLD   90
 
