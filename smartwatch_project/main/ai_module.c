@@ -11,6 +11,7 @@
 #include "ei_wrapper.h"
 #include "vibrator_module.h"
 #include "alert_module.h"
+#include "alert_catalog.h"
 #include "ui.h"
 
 #define AUDIO_BUFFER_SIZE   16000   // 1 s @ 16 kHz (lo que exige el modelo)
@@ -27,19 +28,10 @@ static int16_t preroll_ring[PRE_ROLL_CHUNKS][CHUNK_SAMPLES];
 static int preroll_write_idx = 0;
 static int16_t chunk_scratch[CHUNK_SAMPLES]; // buffer de lectura reutilizable, static para no gastar stack
 
-static const struct { const char *label; const char *morse; } ALERT_MORSE[] = {
-    { "ambulance",   "A" },
-    { "baby-crying", "B" },
-    { "fire",        "F" },
-};
-#define ALERT_MORSE_COUNT (sizeof(ALERT_MORSE) / sizeof(ALERT_MORSE[0]))
-
 static const char *morse_for_alert_label(const char *label)
 {
-    for (size_t i = 0; i < ALERT_MORSE_COUNT; i++) {
-        if (strcmp(ALERT_MORSE[i].label, label) == 0) return ALERT_MORSE[i].morse;
-    }
-    return NULL;
+    int idx = alert_catalog_index_of(label);
+    return (idx >= 0) ? alert_catalog_get((size_t)idx)->morse : NULL;
 }
 
 static const char *TAG = "ai_module";

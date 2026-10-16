@@ -1,4 +1,6 @@
 #include "ui.h"
+#include "alert_catalog.h"
+#include "alert_module.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -31,9 +33,9 @@ static lv_obj_t * battery_label = NULL;
 static lv_obj_t * usb_label = NULL;
 static lv_obj_t * notification_label = NULL;
 static lv_obj_t * vu_icon = NULL;
-static lv_obj_t * ambulance_icon = NULL;
-static lv_obj_t * baby_icon = NULL;
-static lv_obj_t * fire_icon = NULL;
+// Un icono y un ultimo nivel por cada clase del catalogo, con el mismo indice.
+static lv_obj_t * alert_icons[ALERT_CATALOG_MAX];
+static alert_level_t alert_prev_level[ALERT_CATALOG_MAX];
 
 static const char *TAG = "esp32_c6_ui_module";
 lv_disp_t * disp;
@@ -59,24 +61,6 @@ typedef struct {
     } data;
 } ui_msg_t;
 
-typedef struct {
-    const char *label;
-    const char *msg[3];   // [0]=LOW, [1]=MEDIUM, [2]=HIGH
-    int prev_level;
-} alert_msg_t;
-
-static alert_msg_t alert_msgs[] = {
-    { "ambulance",   { "Posible ambulancia cerca",
-                       "Parece que viene una ambulancia",
-                       "Alerta! Ambulancia cerca" }, 0 },
-    { "baby-crying", { "Posible llanto de bebe",
-                       "Parece que un bebe esta llorando",
-                       "Alerta! Bebe llorando" }, 0 },
-    { "fire",        { "Posible alarma de fuego",
-                       "Parece que suena una alarma de fuego",
-                       "Alerta! Alarma de fuego" }, 0 },
-};
-
 static QueueHandle_t ui_queue = NULL;
 static void ui_task(void *arg);
 static void ui_update_notification(const char *text);
@@ -84,35 +68,29 @@ static void ui_update_notification(const char *text);
 extern const lv_font_t nine_pin_70;
 extern const lv_font_t fa_icons_32;
 
-#define ICON_AMBULANCE "\xEF\x83\xB9"
-#define ICON_BABY "\xEF\x9D\xBC"
-#define ICON_FIRE "\xEF\x81\xAD"
-
-static void update_alert_text(const char *label, int level)
+static void update_alert_text(size_t idx, alert_level_t level)
 {
-    for (size_t i = 0; i < sizeof(alert_msgs) / sizeof(alert_msgs[0]); i++) {
-        alert_msg_t *m = &alert_msgs[i];
-        if (strcmp(m->label, label) != 0) continue;
-        if (level == m->prev_level) return;   // el nivel no cambio
-        m->prev_level = level;
-        if (level >= 1 && level <= 3) ui_update_notification(m->msg[level - 1]);
-        else                          ui_update_notification("");
-        return;
+    if (level == alert_prev_level[idx]) return;   // el nivel no cambio
+    alert_prev_level[idx] = level;
+    if (level >= ALERT_LOW && level <= ALERT_HIGH) {
+        ui_update_notification(alert_catalog_get(idx)->msg[level - ALERT_LOW]);
+    } else {
+        ui_update_notification("");
     }
 }
 
-static void set_alert_icon_style(lv_obj_t *icon, int level)
+static void set_alert_icon_style(lv_obj_t *icon, alert_level_t level)
 {
     switch (level) {
-        case 3: // HIGH
+        case ALERT_HIGH:
             lv_obj_set_style_text_color(icon, lv_color_hex(0xFF0000), LV_PART_MAIN);
             lv_obj_set_style_text_opa(icon, LV_OPA_COVER, LV_PART_MAIN);
             break;
-        case 2: // MEDIUM
+        case ALERT_MEDIUM:
             lv_obj_set_style_text_color(icon, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
             lv_obj_set_style_text_opa(icon, LV_OPA_COVER, LV_PART_MAIN);
             break;
-        case 1: // LOW
+        case ALERT_LOW:
             lv_obj_set_style_text_color(icon, lv_color_hex(0x660066), LV_PART_MAIN);
             lv_obj_set_style_text_opa(icon, LV_OPA_COVER, LV_PART_MAIN);
             break;
@@ -132,26 +110,18 @@ void ui_alert_icon_init(void)
     lv_obj_set_style_text_color(vu_icon, lv_color_hex(0x00FFBB), LV_PART_MAIN);
     lv_obj_align(vu_icon, LV_ALIGN_BOTTOM_LEFT, 10, -20);
     
-    ambulance_icon = lv_label_create(scr);
-    lv_obj_set_style_text_font(ambulance_icon, &fa_icons_32, LV_PART_MAIN);
-    lv_obj_set_style_text_color(ambulance_icon, lv_color_hex(0x660066), LV_PART_MAIN);
-     lv_obj_set_style_text_opa(ambulance_icon, LV_OPA_10, LV_PART_MAIN);
-    lv_label_set_text(ambulance_icon, ICON_AMBULANCE);
-    lv_obj_align_to(ambulance_icon, vu_icon, LV_ALIGN_OUT_RIGHT_MID, -20, 0);
-
-    baby_icon = lv_label_create(scr);
-    lv_obj_set_style_text_font(baby_icon, &fa_icons_32, LV_PART_MAIN);
-    lv_obj_set_style_text_color(baby_icon, lv_color_hex(0x660066), LV_PART_MAIN);
-    lv_obj_set_style_text_opa(baby_icon, LV_OPA_10, LV_PART_MAIN);
-    lv_label_set_text(baby_icon, ICON_BABY);
-    lv_obj_align_to(baby_icon, ambulance_icon, LV_ALIGN_OUT_RIGHT_MID, 35, 0);
-
-    fire_icon = lv_label_create(scr);
-    lv_obj_set_style_text_font(fire_icon, &fa_icons_32, LV_PART_MAIN);
-    lv_obj_set_style_text_color(fire_icon, lv_color_hex(0x660066), LV_PART_MAIN);
-    lv_obj_set_style_text_opa(fire_icon, LV_OPA_10, LV_PART_MAIN);
-    lv_label_set_text(fire_icon, ICON_FIRE);
-    lv_obj_align_to(fire_icon, baby_icon, LV_ALIGN_OUT_RIGHT_MID, 35, 0);
+    // Un icono por clase del catalogo, en fila: el primero junto al VU y cada uno
+    // a continuacion del anterior.
+    for (size_t i = 0; i < alert_catalog_count(); i++) {
+        lv_obj_t *icon = lv_label_create(scr);
+        lv_obj_set_style_text_font(icon, &fa_icons_32, LV_PART_MAIN);
+        lv_obj_set_style_text_color(icon, lv_color_hex(0x660066), LV_PART_MAIN);
+        lv_obj_set_style_text_opa(icon, LV_OPA_10, LV_PART_MAIN);
+        lv_label_set_text(icon, alert_catalog_get(i)->glyph);
+        if (i == 0) lv_obj_align_to(icon, vu_icon, LV_ALIGN_OUT_RIGHT_MID, -20, 0);
+        else        lv_obj_align_to(icon, alert_icons[i - 1], LV_ALIGN_OUT_RIGHT_MID, 35, 0);
+        alert_icons[i] = icon;
+    }
 }
 
 void ui_display_init(void)
@@ -322,14 +292,10 @@ static void ui_update_vu(int level)
 
 static void ui_update_alert_icon(const char *label, int level)
 {
-    lv_obj_t *target = NULL;
-    if (strcmp(label, "ambulance") == 0) target = ambulance_icon;
-    else if (strcmp(label, "baby-crying") == 0) target = baby_icon;
-    else if (strcmp(label, "fire") == 0) target = fire_icon;
-
-    if (target != NULL) {
-       set_alert_icon_style(target, level);
-       update_alert_text(label, level);
+    int idx = alert_catalog_index_of(label);
+    if (idx >= 0) {
+       set_alert_icon_style(alert_icons[idx], (alert_level_t)level);
+       update_alert_text((size_t)idx, (alert_level_t)level);
     }
 }
 
