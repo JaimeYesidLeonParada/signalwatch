@@ -41,12 +41,16 @@ static const char *morse_for_char(char c)
     return NULL; // caracter no soportado, se ignora
 }
 
+void vibrator_pulse(uint32_t ms)
+{
+    gpio_set_level(MOTOR_VIBRATOR_PIN, 1);
+    vTaskDelay(pdMS_TO_TICKS(ms));
+    gpio_set_level(MOTOR_VIBRATOR_PIN, 0);
+}
+
 static void vibrator_play_symbol(char symbol)
 {
-    uint32_t on_ms = (symbol == '-') ? MORSE_DASH_MS : MORSE_UNIT_MS;
-    gpio_set_level(MOTOR_VIBRATOR_PIN, 1);
-    vTaskDelay(pdMS_TO_TICKS(on_ms));
-    gpio_set_level(MOTOR_VIBRATOR_PIN, 0);
+    vibrator_pulse((symbol == '-') ? MORSE_DASH_MS : MORSE_UNIT_MS);
 }
 
 static void vibrator_task(void *arg)

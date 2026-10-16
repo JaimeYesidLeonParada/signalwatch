@@ -3,9 +3,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "vibrator_module.h"
 
 #define BOOT_BUTTON_PIN 9
-#define MOTOR_VIBRATOR_PIN 18 // Reutilizamos el pin de tu main.c
+#define BUTTON_PULSE_MS 100
 
 static const char *TAG = "button_module";
 
@@ -22,9 +23,7 @@ static void button_task(void *arg)
             ESP_LOGI(TAG, "¡Botón BOOT presionado!");
             
             // Activamos el vibrador
-            gpio_set_level(MOTOR_VIBRATOR_PIN, 1);
-            vTaskDelay(pdMS_TO_TICKS(100)); // Vibra por 100ms
-            gpio_set_level(MOTOR_VIBRATOR_PIN, 0);
+            vibrator_pulse(BUTTON_PULSE_MS);
         }
         
         last_state = current_state;
