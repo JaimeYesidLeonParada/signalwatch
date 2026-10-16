@@ -23,10 +23,15 @@
 #define I2S_DOUT_PIN    23 
 #define I2S_DIN_PIN     21  
 
-i2s_chan_handle_t tx_handle;
-i2s_chan_handle_t rx_handle;
-esp_codec_dev_handle_t output_dev;
-esp_codec_dev_handle_t input_dev;
+static i2s_chan_handle_t tx_handle;
+static i2s_chan_handle_t rx_handle;
+static esp_codec_dev_handle_t output_dev;
+static esp_codec_dev_handle_t input_dev;
+
+esp_codec_dev_handle_t bsp_es8311_get_input_dev(void)
+{
+    return input_dev;
+}
 
 static esp_err_t es8311_i2s_init(void)
 {

@@ -1,6 +1,8 @@
 #ifndef AI_MODULE_H
 #define AI_MODULE_H
 
-void ai_module_start(void);
+#include "esp_codec_dev.h"
+
+void ai_module_start(esp_codec_dev_handle_t mic);
 
 #endif // AI_MODULE_H

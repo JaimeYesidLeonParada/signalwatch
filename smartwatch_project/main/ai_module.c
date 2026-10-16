@@ -44,7 +44,7 @@ static const char *morse_for_alert_label(const char *label)
 
 static const char *TAG = "ai_module";
 
-extern esp_codec_dev_handle_t input_dev;
+static esp_codec_dev_handle_t mic_dev;
 
 // Doble buffer: mientras uno se clasifica, el otro se esta llenando
 static int16_t *audio_buffers[2];
@@ -64,7 +64,7 @@ static void audio_capture_task(void *arg) {
     bool was_loud = false;
 
     while (1) {
-        int err = esp_codec_dev_read(input_dev, (void *)chunk_scratch, chunk_bytes);
+        int err = esp_codec_dev_read(mic_dev,(void *)chunk_scratch, chunk_bytes);
         if (err != ESP_CODEC_DEV_OK) {
             ESP_LOGE(TAG, "Error leyendo microfono: %d", err);
             continue;
@@ -146,7 +146,9 @@ static void audio_classify_task(void *arg) {
     }
 }
 
-void ai_module_start(void) {
+void ai_module_start(esp_codec_dev_handle_t mic) {
+    mic_dev = mic;
+
     audio_buffers[0] = (int16_t *)malloc(AUDIO_BUFFER_SIZE * sizeof(int16_t));
     audio_buffers[1] = (int16_t *)malloc(AUDIO_BUFFER_SIZE * sizeof(int16_t));
 

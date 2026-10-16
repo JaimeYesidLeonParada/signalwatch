@@ -40,7 +40,7 @@ void config_init_modules(void)
     vibrator_init();
 
     ei_wrapper_init();
-    ai_module_start();
+    ai_module_start(bsp_es8311_get_input_dev());
     rtc_task_start();
     vibrator_task_start();
 }
