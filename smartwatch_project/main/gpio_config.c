@@ -9,6 +9,7 @@
 #include "battery_module.h"
 #include "touch_module.h"
 #include "ai_module.h"
+#include "alert_dispatcher.h"
 #include "vibrator_module.h"
 
 #define BATTERY_ENABLE_PIN 15
@@ -40,7 +41,12 @@ void config_init_modules(void)
     vibrator_init();
 
     ei_wrapper_init();
-    ai_module_start(bsp_es8311_get_input_dev());
+    alert_dispatcher_init();
+    const ai_listener_t ai_listener = {
+        .on_audio_level    = alert_dispatcher_on_audio_level,
+        .on_classification = alert_dispatcher_on_classification,
+    };
+    ai_module_start(bsp_es8311_get_input_dev(), &ai_listener);
     rtc_task_start();
     vibrator_task_start();
 }

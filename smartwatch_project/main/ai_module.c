@@ -9,10 +9,6 @@
 #include "esp_codec_dev.h"
 #include "esp_timer.h"
 #include "ei_wrapper.h"
-#include "vibrator_module.h"
-#include "alert_module.h"
-#include "alert_catalog.h"
-#include "ui.h"
 
 #define AUDIO_BUFFER_SIZE   16000   // 1 s @ 16 kHz (lo que exige el modelo)
 #define CHUNK_SAMPLES       1000
@@ -22,21 +18,15 @@
 #define CLASSIFY_TASK_PRIORITY   0   // la mas baja (idle): nunca bloquea al resto del sistema
 #define SOUND_THRESHOLD   15
 #define PRE_ROLL_CHUNKS   4   // ~250 ms de contexto antes del disparo (AJUSTAR con pruebas)
-#define LOUD_SOUND_THRESHOLD   90
 
 static int16_t preroll_ring[PRE_ROLL_CHUNKS][CHUNK_SAMPLES];
 static int preroll_write_idx = 0;
 static int16_t chunk_scratch[CHUNK_SAMPLES]; // buffer de lectura reutilizable, static para no gastar stack
 
-static const char *morse_for_alert_label(const char *label)
-{
-    int idx = alert_catalog_index_of(label);
-    return (idx >= 0) ? alert_catalog_get((size_t)idx)->morse : NULL;
-}
-
 static const char *TAG = "ai_module";
 
 static esp_codec_dev_handle_t mic_dev;
+static ai_listener_t listener;
 
 // Doble buffer: mientras uno se clasifica, el otro se esta llenando
 static int16_t *audio_buffers[2];
@@ -53,10 +43,9 @@ static void audio_capture_task(void *arg) {
     int buf_idx = -1;
     int chunks_filled = 0;
     int64_t fill_start = 0;
-    bool was_loud = false;
 
     while (1) {
-        int err = esp_codec_dev_read(mic_dev,(void *)chunk_scratch, chunk_bytes);
+        int err = esp_codec_dev_read(mic_dev, (void *)chunk_scratch, chunk_bytes);
         if (err != ESP_CODEC_DEV_OK) {
             ESP_LOGE(TAG, "Error leyendo microfono: %d", err);
             continue;
@@ -67,14 +56,7 @@ static void audio_capture_task(void *arg) {
 
         int level = (int)((sum / CHUNK_SAMPLES) / 20);
         if (level > 100) level = 100;
-        ui_post_audio_level_msg(level);
-
-        bool is_loud = (level >= LOUD_SOUND_THRESHOLD);
-        if (is_loud && !was_loud) {
-            vibration_morse_play("I");
-            ui_post_notification_msg("Ruido fuerte cerca!");
-        }
-        was_loud = is_loud;
+        if (listener.on_audio_level) listener.on_audio_level(level);
 
         if (!filling) {
             memcpy(preroll_ring[preroll_write_idx], chunk_scratch, chunk_bytes);
@@ -115,31 +97,16 @@ static void audio_classify_task(void *arg) {
 
         ei_wrapper_result_t result;
         if (ei_wrapper_classify(audio_buffers[buf_idx], AUDIO_BUFFER_SIZE, &result)) {
-            ui_post_inference_msg(result.classifications[result.best_index].label,
-                                   result.classifications[result.best_index].confidence);
-
-            static const char *ALERT_LEVEL_NAMES[] = { "NONE", "LOW", "MEDIUM", "HIGH" };
-            for (int i = 0; i < result.count; i++) {
-                alert_level_t lvl = alert_module_add_sample(result.classifications[i].label,
-                                                             result.classifications[i].confidence);
-                ESP_LOGI(TAG, "    %s -> nivel post-procesado: %s", result.classifications[i].label, ALERT_LEVEL_NAMES[lvl]);
-                ui_post_alert_icon_msg(result.classifications[i].label, (int)lvl);
-
-                if (lvl == ALERT_HIGH || lvl == ALERT_MEDIUM) {
-                    const char *morse = morse_for_alert_label(result.classifications[i].label);
-                    if (morse != NULL) {
-                        vibration_morse_play(morse);
-                    }
-                }    
-            }
+            if (listener.on_classification) listener.on_classification(&result);
         }
 
         xQueueSend(buffer_free_queue, &buf_idx, portMAX_DELAY);
     }
 }
 
-void ai_module_start(esp_codec_dev_handle_t mic) {
+void ai_module_start(esp_codec_dev_handle_t mic, const ai_listener_t *l) {
     mic_dev = mic;
+    if (l != NULL) listener = *l;
 
     audio_buffers[0] = (int16_t *)malloc(AUDIO_BUFFER_SIZE * sizeof(int16_t));
     audio_buffers[1] = (int16_t *)malloc(AUDIO_BUFFER_SIZE * sizeof(int16_t));
