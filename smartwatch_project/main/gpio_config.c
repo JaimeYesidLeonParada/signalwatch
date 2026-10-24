@@ -37,7 +37,7 @@ void config_init_modules(void)
     touch_init(bus_handle);
 
     button_init();
-    battery_init();
+    battery_init(ui_post_battery_msg);
     vibrator_init();
 
     ei_wrapper_init();
@@ -47,7 +47,7 @@ void config_init_modules(void)
         .on_classification = alert_dispatcher_on_classification,
     };
     ai_module_start(bsp_es8311_get_input_dev(), &ai_listener);
-    rtc_task_start();
+    rtc_task_start(ui_post_clock_msg);
     vibrator_task_start();
 }
 

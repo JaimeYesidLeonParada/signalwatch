@@ -1,10 +1,8 @@
 #include "rtc_module.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "ui.h"
-#include <stdio.h>
 
-#define PCF85063_ADDR 0x51 
+#define PCF85063_ADDR 0x51
 #define CLOCK_TASK_PRIORITY   1
 #define CLOCK_UPDATE_MS       (1 * 60 * 1000)
 
@@ -12,23 +10,25 @@ static i2c_master_dev_handle_t rtc_dev_handle;
 
 static uint8_t bcd2dec(uint8_t val) { return ((val / 16 * 10) + (val % 16)); }
 static uint8_t dec2bcd(uint8_t val) { return ((val / 10 * 16) + (val % 10)); }
-static const char *const DAY_NAMES[]   = {"Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"};
-static const char *const MONTH_NAMES[] = {"Ene", "Feb", "Mar", "Abr", "May", "Jun",
-                                          "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"};
+
+static rtc_clock_cb_t clock_cb;
 
 static void clock_task(void *arg)
 {
-    char time_str[16];
-    char date_str[16];
     while (1) {
-        rtc_get_time_str(time_str, sizeof(time_str), date_str, sizeof(date_str));
-        ui_post_clock_msg(time_str, date_str);
+        rtc_time_t t;
+        bool ok = rtc_get_time(&t);
+        if (clock_cb) {
+            if (ok) clock_cb(t.hr, t.min, t.dow, t.day, t.month, true);
+            else    clock_cb(0, 0, 0, 0, 0, false);
+        }
         vTaskDelay(pdMS_TO_TICKS(CLOCK_UPDATE_MS));
     }
 }
 
-void rtc_task_start(void)
+void rtc_task_start(rtc_clock_cb_t on_clock)
 {
+    clock_cb = on_clock;
     xTaskCreate(clock_task, "clock_task", 4096, NULL, CLOCK_TASK_PRIORITY, NULL);
 }
 
@@ -42,29 +42,23 @@ void rtc_init(i2c_master_bus_handle_t bus_handle)
     ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_cfg, &rtc_dev_handle));
 }
 
-void rtc_get_time_str(char *time_str, size_t time_len, char *date_str, size_t date_len)
+bool rtc_get_time(rtc_time_t *out)
 {
     uint8_t rx_data[7];
     uint8_t reg = 0x04; // Registro 0x04: Empiezan los segundos
 
     // Le pedimos 7 bytes al chip a partir del registro 0x04
     esp_err_t err = i2c_master_transmit_receive(rtc_dev_handle, &reg, 1, rx_data, sizeof(rx_data), -1);
-    
-    if (err == ESP_OK) {
-        uint8_t sec   = bcd2dec(rx_data[0] & 0x7F);
-        uint8_t min   = bcd2dec(rx_data[1] & 0x7F);
-        uint8_t hr    = bcd2dec(rx_data[2] & 0x3F);
-        uint8_t day   = bcd2dec(rx_data[3] & 0x3F);
-        uint8_t dow   = bcd2dec(rx_data[4] & 0x3F);
-        uint8_t month = bcd2dec(rx_data[5] & 0x1F);
-        uint8_t year  = bcd2dec(rx_data[6]);
+    if (err != ESP_OK) return false;
 
-        snprintf(time_str, time_len, "%02d:%02d:%02d", hr, min, sec);
-        snprintf(date_str, date_len, "%s %d %s", DAY_NAMES[dow], day, MONTH_NAMES[month - 1]);
-    } else {
-        snprintf(time_str, time_len, "Error RTC");
-        snprintf(date_str, date_len, "");
-    }
+    out->sec   = bcd2dec(rx_data[0] & 0x7F);
+    out->min   = bcd2dec(rx_data[1] & 0x7F);
+    out->hr    = bcd2dec(rx_data[2] & 0x3F);
+    out->day   = bcd2dec(rx_data[3] & 0x3F);
+    out->dow   = bcd2dec(rx_data[4] & 0x3F);
+    out->month = bcd2dec(rx_data[5] & 0x1F);
+    out->year  = bcd2dec(rx_data[6]);
+    return true;
 }
 
 void rtc_set_time(uint16_t year, uint8_t month, uint8_t day, uint8_t dow, uint8_t hr, uint8_t min, uint8_t sec)

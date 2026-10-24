@@ -52,7 +52,7 @@ typedef enum {
 typedef struct {
     ui_msg_type_t type;
     union {
-        struct { char time_str[16]; char date_str[16]; } clock;
+        struct { int hour, min, dow, day, month; bool valid; } clock;
         struct { int bat_pct; bool is_charging; } battery;
         struct { char label[32]; float confidence; } inference;
         struct { int level; } audio_level;
@@ -196,7 +196,11 @@ void ui_display_init(void)
     xTaskCreate(ui_task, "ui_task", 4096, NULL, 4, NULL);
 }
 
-static void ui_update_clock(const char *time_str, const char *date_str)
+static const char *const DAY_NAMES[]   = {"Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"};
+static const char *const MONTH_NAMES[] = {"Ene", "Feb", "Mar", "Abr", "May", "Jun",
+                                          "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"};
+
+static void ui_update_clock(int hr, int min, int dow, int day, int month, bool valid)
 {
     lv_obj_t * scr = lv_disp_get_scr_act(disp);
     if (clock_label == NULL) {
@@ -212,14 +216,14 @@ static void ui_update_clock(const char *time_str, const char *date_str)
         lv_obj_align(date_label, LV_ALIGN_TOP_LEFT, 10, 10);
     }
 
-    int hr = 0, min = 0;
-    sscanf(time_str, "%d:%d", &hr, &min);
+    if (!valid) hr = min = 0;   // sin lectura del RTC: se muestra 12:00 y sin fecha
 
     int hr12 = hr % 12;
     if (hr12 == 0) hr12 = 12;
 
     lv_label_set_text_fmt(clock_label, "%d:%02d", hr12, min);
-    lv_label_set_text(date_label, date_str);
+    if (valid) lv_label_set_text_fmt(date_label, "%s %d %s", DAY_NAMES[dow], day, MONTH_NAMES[month - 1]);
+    else       lv_label_set_text(date_label, "");
 }
 
 static void ui_update_battery(int bat_pct, bool is_charging)
@@ -307,7 +311,8 @@ static void ui_task(void *arg)
             if (lvgl_port_lock(-1)) {
                 switch (msg.type) {
                     case UI_MSG_CLOCK:
-                    ui_update_clock(msg.data.clock.time_str, msg.data.clock.date_str);
+                    ui_update_clock(msg.data.clock.hour, msg.data.clock.min, msg.data.clock.dow,
+                                    msg.data.clock.day, msg.data.clock.month, msg.data.clock.valid);
                     break;
                     
                     case UI_MSG_BATTERY:
@@ -344,11 +349,9 @@ void ui_post_notification_msg(const char *text)
     xQueueSend(ui_queue, &msg, 0);
 }
 
-void ui_post_clock_msg(const char *time_str, const char *date_str)
+void ui_post_clock_msg(int hour, int min, int dow, int day, int month, bool valid)
 {
-    ui_msg_t msg = { .type = UI_MSG_CLOCK };
-    strncpy(msg.data.clock.time_str, time_str, sizeof(msg.data.clock.time_str) - 1);
-    strncpy(msg.data.clock.date_str, date_str, sizeof(msg.data.clock.date_str) - 1);
+    ui_msg_t msg = { .type = UI_MSG_CLOCK, .data.clock = { hour, min, dow, day, month, valid } };
     xQueueSend(ui_queue, &msg, 0);
 }
 

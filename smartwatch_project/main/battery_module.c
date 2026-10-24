@@ -5,7 +5,6 @@
 #include "esp_adc/adc_cali_scheme.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "ui.h"
 
 static const char *TAG = "battery_module";
 
@@ -20,13 +19,14 @@ static adc_oneshot_unit_handle_t adc1_handle;
 static adc_cali_handle_t cali_handle;
 static bool cali_enable = false;
 static float smoothed_pct = -1.0f; // -1 = todavia sin ninguna lectura
+static battery_status_cb_t status_cb;
 
 static void battery_task(void *arg)
 {
     while (1) {
         int bat_pct = battery_get_percentage();
         bool is_charging = (bat_pct >= CHARGING_PCT_THRESHOLD);
-        ui_post_battery_msg(bat_pct, is_charging);
+        if (status_cb) status_cb(bat_pct, is_charging);
         vTaskDelay(pdMS_TO_TICKS(BATTERY_UPDATE_MS));
     }
 }
@@ -36,8 +36,10 @@ void battery_task_start(void)
     xTaskCreate(battery_task, "battery_task", 4096, NULL, BATTERY_TASK_PRIORITY, NULL);
 }
 
-void battery_init(void)
+void battery_init(battery_status_cb_t on_status)
 {
+    status_cb = on_status;
+
     ESP_LOGI(TAG, "Inicializando ADC para la Batería...");
 
     // 1. Configurar la Unidad ADC1
