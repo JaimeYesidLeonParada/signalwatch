@@ -18,7 +18,8 @@ typedef void (*rtc_clock_cb_t)(int hour, int min, int dow, int day, int month, b
 // Registra el reloj en el bus I2C que ya existe
 void rtc_init(i2c_master_bus_handle_t bus_handle);
 
-// Lee la hora actual del chip. Devuelve false si falla la lectura I2C.
+// Lee la hora actual del chip. Devuelve false si falla la lectura I2C o si algun campo
+// viene fuera de rango (hr 0-23, min 0-59, dow 0-6, day 1-31, month 1-12).
 bool rtc_get_time(rtc_time_t *out);
 
 void rtc_set_time(uint16_t year, uint8_t month, uint8_t day, uint8_t dow, uint8_t hr, uint8_t min, uint8_t sec);

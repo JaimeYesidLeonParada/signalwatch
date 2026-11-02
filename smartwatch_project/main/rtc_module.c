@@ -58,7 +58,12 @@ bool rtc_get_time(rtc_time_t *out)
     out->dow   = bcd2dec(rx_data[4] & 0x3F);
     out->month = bcd2dec(rx_data[5] & 0x1F);
     out->year  = bcd2dec(rx_data[6]);
-    return true;
+
+    // Con el chip sin configurar o sin pila los campos pueden salir fuera de rango;
+    // se descartan para que nadie indexe tablas con ellos.
+    bool plausible = out->hr <= 23 && out->min <= 59 && out->dow <= 6 &&
+                     out->day >= 1 && out->day <= 31 && out->month >= 1 && out->month <= 12;
+    return plausible;
 }
 
 void rtc_set_time(uint16_t year, uint8_t month, uint8_t day, uint8_t dow, uint8_t hr, uint8_t min, uint8_t sec)
