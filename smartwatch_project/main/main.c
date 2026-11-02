@@ -1,7 +1,7 @@
 #include <stdio.h>
-#include "gpio_config.h"
+#include "app_init.h"
 
 void app_main(void)
 {
-    gpio_config_init();
+    app_init();
 }

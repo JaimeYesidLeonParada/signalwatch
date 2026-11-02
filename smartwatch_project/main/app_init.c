@@ -1,4 +1,4 @@
-#include "gpio_config.h"
+#include "app_init.h"
 #include "i2c_bus.h"
 #include "ei_wrapper.h"
 #include "bsp_es8311.h"
@@ -14,8 +14,11 @@
 
 // Composition root: aqui se crean los modulos y se conectan entre si. El orden
 // importa, cada paso indica de que depende.
-void config_init_modules(void)
+void app_init(void)
 {
+    // Lo primero de todo: sin esto la placa no se alimenta de la bateria.
+    battery_power_enable();
+
     // Pantalla y UI primero: los avisos de reloj y bateria llegan a la cola que crea
     // ui_start, y touch necesita el display ya inicializado.
     lv_disp_t *disp = display_hw_init();
@@ -46,12 +49,4 @@ void config_init_modules(void)
 
     rtc_task_start(ui_post_clock_msg);    // necesita la cola de ui
     vibrator_task_start();
-}
-
-void gpio_config_init(void)
-{
-    // Lo primero de todo: sin esto la placa no se alimenta de la bateria.
-    battery_power_enable();
-
-    config_init_modules();
 }
