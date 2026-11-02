@@ -2,12 +2,14 @@
 #define UI_H
 
 #include <stdbool.h>
+#include "lvgl.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void ui_display_init(void);
+// Crea los widgets, la cola y ui_task sobre un display ya inicializado (ver display_hw_init).
+void ui_start(lv_disp_t *display);
 
 // Misma firma que rtc_clock_cb_t. dow: 0=domingo; si valid es false se muestra la hora en 12:00 y sin fecha.
 void ui_post_clock_msg(int hour, int min, int dow, int day, int month, bool valid);

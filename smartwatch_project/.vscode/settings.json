@@ -33,5 +33,5 @@
     "--compile-commands-dir=c:\\Users\\ingen\\Documents\\ESP\\esp32_c6\\smartwatch\\smartwatch_project\\build"
   ],
   "idf.flashType": "UART",
-  "idf.port": "COM15"
+  "idf.port": "COM17"
 }
