@@ -73,10 +73,12 @@ The firmware follows SOLID principles. Modules do not know each other: `app_init
 
 ## Roadmap
 
-- [ ] Set date and time from the watch
-- [ ] User-facing battery settings
-- [ ] Take the LVGL lock when registering the touch input device
-- [ ] More sound classes
+Planned work is tracked in [Issues](https://github.com/JaimeYesidLeonParada/signalwatch/issues):
+
+- Set date and time from the watch
+- User-facing battery settings
+- Take the LVGL lock when registering the touch input device
+- More sound classes
 
 ## License
 
