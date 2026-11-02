@@ -7,7 +7,9 @@
 ![LVGL 9](https://img.shields.io/badge/UI-LVGL%209-green)
 ![License: MIT](https://img.shields.io/badge/license-MIT-yellow)
 
-<!-- TODO: add a photo or GIF of the watch, e.g. docs/signalwatch.jpg -->
+<p align="center">
+  <img src="docs/signalwatch.jpeg" alt="SignalWatch running on the Waveshare ESP32-C6 watch board" width="480">
+</p>
 
 ## Features
 
