@@ -1,6 +1,5 @@
 #include "gpio_config.h"
-#include "driver/gpio.h"
-#include "driver/i2c_master.h"
+#include "i2c_bus.h"
 #include "ei_wrapper.h"
 #include "bsp_es8311.h"
 #include "rtc_module.h"
@@ -13,34 +12,29 @@
 #include "alert_dispatcher.h"
 #include "vibrator_module.h"
 
-#define BATTERY_ENABLE_PIN 15
-#define I2C_SDA_PIN 8
-#define I2C_SCL_PIN 7
-
+// Composition root: aqui se crean los modulos y se conectan entre si. El orden
+// importa, cada paso indica de que depende.
 void config_init_modules(void)
 {
+    // Pantalla y UI primero: touch necesita LVGL, y los avisos de reloj y bateria
+    // llegan a la cola que crea ui_start.
     ui_start(display_hw_init());
 
-    i2c_master_bus_config_t i2c_mst_config = {
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .i2c_port = I2C_NUM_0,
-        .scl_io_num = I2C_SCL_PIN,
-        .sda_io_num = I2C_SDA_PIN,
-        .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = true,
-    };
-    i2c_master_bus_handle_t bus_handle;
-    ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_mst_config, &bus_handle));
+    i2c_master_bus_handle_t bus_handle = i2c_bus_init();
 
+    // Dispositivos del bus I2C
     bsp_es8311_init(bus_handle);
     bsp_es8311_set_in_volume(40.0);
     rtc_init(bus_handle);
     touch_init(bus_handle);
 
     button_init();
-    battery_init(ui_post_battery_msg);
+    battery_init();
+    battery_start(ui_post_battery_msg);   // necesita la cola de ui
     vibrator_init();
 
+    // El dispatcher traduce los eventos de ai_module a UI y vibracion; debe existir
+    // antes de que arranque la captura.
     ei_wrapper_init();
     alert_dispatcher_init();
     const ai_listener_t ai_listener = {
@@ -48,15 +42,15 @@ void config_init_modules(void)
         .on_classification = alert_dispatcher_on_classification,
     };
     ai_module_start(bsp_es8311_get_input_dev(), &ai_listener);
-    rtc_task_start(ui_post_clock_msg);
+
+    rtc_task_start(ui_post_clock_msg);    // necesita la cola de ui
     vibrator_task_start();
 }
 
 void gpio_config_init(void)
 {
-    gpio_reset_pin(BATTERY_ENABLE_PIN);
-    gpio_set_direction(BATTERY_ENABLE_PIN, GPIO_MODE_OUTPUT);
-    gpio_set_level(BATTERY_ENABLE_PIN, 1); // Batería habilitada
+    // Lo primero de todo: sin esto la placa no se alimenta de la bateria.
+    battery_power_enable();
 
     config_init_modules();
 }

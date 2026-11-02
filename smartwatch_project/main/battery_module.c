@@ -1,5 +1,6 @@
 #include "battery_module.h"
 #include "esp_log.h"
+#include "driver/gpio.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
@@ -8,6 +9,7 @@
 
 static const char *TAG = "battery_module";
 
+#define BATTERY_ENABLE_PIN 15
 #define BAT_ADC_PIN 0 // GPIO0 es ADC1_CHANNEL_0 en el ESP32-C6
 #define VOLTAGE_DIVIDER_RATIO 3.0f // Multiplicador de hardware de la placa
 #define BATTERY_TASK_PRIORITY   1
@@ -31,15 +33,21 @@ static void battery_task(void *arg)
     }
 }
 
-void battery_task_start(void)
+void battery_start(battery_status_cb_t on_status)
 {
+    status_cb = on_status;
     xTaskCreate(battery_task, "battery_task", 4096, NULL, BATTERY_TASK_PRIORITY, NULL);
 }
 
-void battery_init(battery_status_cb_t on_status)
+void battery_power_enable(void)
 {
-    status_cb = on_status;
+    gpio_reset_pin(BATTERY_ENABLE_PIN);
+    gpio_set_direction(BATTERY_ENABLE_PIN, GPIO_MODE_OUTPUT);
+    gpio_set_level(BATTERY_ENABLE_PIN, 1); // Batería habilitada
+}
 
+void battery_init(void)
+{
     ESP_LOGI(TAG, "Inicializando ADC para la Batería...");
 
     // 1. Configurar la Unidad ADC1
@@ -69,8 +77,6 @@ void battery_init(battery_status_cb_t on_status)
     } else {
         ESP_LOGW(TAG, "Calibración del ADC fallida. Usando valores brutos.");
     }
-
-    battery_task_start();
 }
 
 int battery_get_voltage_mv(void)
