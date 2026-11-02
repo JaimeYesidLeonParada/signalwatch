@@ -16,9 +16,10 @@
 // importa, cada paso indica de que depende.
 void config_init_modules(void)
 {
-    // Pantalla y UI primero: touch necesita LVGL, y los avisos de reloj y bateria
-    // llegan a la cola que crea ui_start.
-    ui_start(display_hw_init());
+    // Pantalla y UI primero: los avisos de reloj y bateria llegan a la cola que crea
+    // ui_start, y touch necesita el display ya inicializado.
+    lv_disp_t *disp = display_hw_init();
+    ui_start(disp);
 
     i2c_master_bus_handle_t bus_handle = i2c_bus_init();
 
@@ -26,7 +27,7 @@ void config_init_modules(void)
     bsp_es8311_init(bus_handle);
     bsp_es8311_set_in_volume(40.0);
     rtc_init(bus_handle);
-    touch_init(bus_handle);
+    touch_init(bus_handle, disp);
 
     button_init();
     battery_init();

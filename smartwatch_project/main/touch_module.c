@@ -35,7 +35,7 @@ static void touch_read_cb(lv_indev_t * indev, lv_indev_data_t * data)
     }
 }
 
-void touch_init(i2c_master_bus_handle_t bus_handle)
+void touch_init(i2c_master_bus_handle_t bus_handle, lv_disp_t *disp)
 {
     ESP_LOGI(TAG, "Agregando Touch CST816 al bus I2C...");
 
@@ -50,6 +50,7 @@ void touch_init(i2c_master_bus_handle_t bus_handle)
     lv_indev_t * indev = lv_indev_create();
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(indev, touch_read_cb);
+    lv_indev_set_display(indev, disp);
     
     ESP_LOGI(TAG, "Driver Touch registrado en LVGL v9 con éxito.");
 }
