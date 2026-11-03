@@ -27,7 +27,7 @@ void alert_module_init(void)
 static alert_window_t *find_or_register(const char *label)
 {
     for (int i = 0; i < ALERT_MAX_LABELS; i++) {
-        if (windows[i].in_use && strcmp(windows[i].label, label) == 0) {
+        if (windows[i].in_use && strncmp(windows[i].label, label, sizeof(windows[i].label) - 1) == 0) {
             return &windows[i];
         }
     }
