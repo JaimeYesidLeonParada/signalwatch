@@ -1,4 +1,5 @@
 #include "vibrator_module.h"
+#include "morse.h"
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -9,37 +10,12 @@
 #define MOTOR_VIBRATOR_PIN     18
 #define VIBRATOR_TASK_PRIORITY 2
 
-#define MORSE_UNIT_MS        150                    // duracion de un "punto"
-#define MORSE_DASH_MS        (MORSE_UNIT_MS * 3)     // duracion de una "raya"
-#define MORSE_SYMBOL_GAP_MS  MORSE_UNIT_MS           // pausa entre simbolos de una letra
-#define MORSE_LETTER_GAP_MS  (MORSE_UNIT_MS * 3)     // pausa entre letras
-#define MORSE_WORD_GAP_MS    (MORSE_UNIT_MS * 7)     // pausa entre palabras (espacio)
-
 #define VIBRATOR_MAX_MESSAGE_LEN 32
 
 typedef char vibrator_message_t[VIBRATOR_MAX_MESSAGE_LEN];
 
 static QueueHandle_t vibration_queue;
 static volatile bool vibrator_busy = false;
-
-static const char *const MORSE_LETTERS[26] = {
-    ".-", "-...", "-.-.", "-..", ".", "..-.", "--.", "....", "..",
-    ".---", "-.-", ".-..", "--", "-.", "---", ".--.", "--.-", ".-.",
-    "...", "-", "..-", "...-", ".--", "-..-", "-.--", "--..",
-};
-
-static const char *const MORSE_DIGITS[10] = {
-    "-----", ".----", "..---", "...--", "....-",
-    ".....", "-....", "--...", "---..", "----.",
-};
-
-static const char *morse_for_char(char c)
-{
-    if (c >= 'a' && c <= 'z') c -= ('a' - 'A');
-    if (c >= 'A' && c <= 'Z') return MORSE_LETTERS[c - 'A'];
-    if (c >= '0' && c <= '9') return MORSE_DIGITS[c - '0'];
-    return NULL; // caracter no soportado, se ignora
-}
 
 void vibrator_pulse(uint32_t ms)
 {
@@ -48,42 +24,18 @@ void vibrator_pulse(uint32_t ms)
     gpio_set_level(MOTOR_VIBRATOR_PIN, 0);
 }
 
-static void vibrator_play_symbol(char symbol)
-{
-    vibrator_pulse((symbol == '-') ? MORSE_DASH_MS : MORSE_UNIT_MS);
-}
-
 static void vibrator_task(void *arg)
 {
     vibrator_message_t msg;
+    static morse_step_t steps[(VIBRATOR_MAX_MESSAGE_LEN - 1) * MORSE_STEPS_PER_CHAR]; // static: no gasta stack
     while (1) {
         xQueueReceive(vibration_queue, msg, portMAX_DELAY);
         vibrator_busy = true;
 
-        bool first_letter = true;
-        for (int i = 0; msg[i] != '\0'; i++) {
-            char c = msg[i];
-
-            if (c == ' ') {
-                vTaskDelay(pdMS_TO_TICKS(MORSE_WORD_GAP_MS));
-                first_letter = true;
-                continue;
-            }
-
-            const char *code = morse_for_char(c);
-            if (code == NULL) continue;
-
-            if (!first_letter) {
-                vTaskDelay(pdMS_TO_TICKS(MORSE_LETTER_GAP_MS));
-            }
-            first_letter = false;
-
-            for (int s = 0; code[s] != '\0'; s++) {
-                vibrator_play_symbol(code[s]);
-                if (code[s + 1] != '\0') {
-                    vTaskDelay(pdMS_TO_TICKS(MORSE_SYMBOL_GAP_MS));
-                }
-            }
+        size_t count = morse_encode(msg, steps, sizeof(steps) / sizeof(steps[0]));
+        for (size_t i = 0; i < count; i++) {
+            if (steps[i].on) vibrator_pulse(steps[i].ms);
+            else             vTaskDelay(pdMS_TO_TICKS(steps[i].ms));
         }
 
         vibrator_busy = false;

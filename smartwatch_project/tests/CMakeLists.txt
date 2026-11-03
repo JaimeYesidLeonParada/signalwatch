@@ -31,3 +31,4 @@ endfunction()
 
 add_unit_test(alert_module alert_module.c)
 add_unit_test(alert_catalog alert_catalog.c)
+add_unit_test(morse morse.c)
