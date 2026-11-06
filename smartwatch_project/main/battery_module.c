@@ -1,4 +1,5 @@
 #include "battery_module.h"
+#include "battery_math.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "esp_adc/adc_oneshot.h"
@@ -13,21 +14,19 @@ static const char *TAG = "battery_module";
 #define BAT_ADC_PIN 0 // GPIO0 es ADC1_CHANNEL_0 en el ESP32-C6
 #define VOLTAGE_DIVIDER_RATIO 3.0f // Multiplicador de hardware de la placa
 #define BATTERY_TASK_PRIORITY   1
-#define BATTERY_MAX_VOLTAGE    4140   // Voltaje máximo de la batería (mV)
 #define BATTERY_UPDATE_MS      1000   // 5 segundos
-#define CHARGING_PCT_THRESHOLD   98   // umbral empirico: con USB conectado llega cerca del 100%
 
 static adc_oneshot_unit_handle_t adc1_handle;
 static adc_cali_handle_t cali_handle;
 static bool cali_enable = false;
-static float smoothed_pct = -1.0f; // -1 = todavia sin ninguna lectura
+static battery_filter_t pct_filter = BATTERY_FILTER_INIT;
 static battery_status_cb_t status_cb;
 
 static void battery_task(void *arg)
 {
     while (1) {
         int bat_pct = battery_get_percentage();
-        bool is_charging = (bat_pct >= CHARGING_PCT_THRESHOLD);
+        bool is_charging = battery_is_charging(bat_pct);
         if (status_cb) status_cb(bat_pct, is_charging);
         vTaskDelay(pdMS_TO_TICKS(BATTERY_UPDATE_MS));
     }
@@ -98,22 +97,6 @@ int battery_get_voltage_mv(void)
 
 int battery_get_percentage(void)
 {
-    int mv = battery_get_voltage_mv();
-    int current_pct;
-
-    if (mv >= BATTERY_MAX_VOLTAGE) {
-        current_pct = 100;
-    } else if (mv <= 3000) {
-        current_pct = 0;
-    } else {
-        current_pct = ((mv - 3000) * 100) / (BATTERY_MAX_VOLTAGE - 3000);
-    }
-
-    if (smoothed_pct < 0) {
-        smoothed_pct = (float)current_pct;
-    } else {
-        smoothed_pct = smoothed_pct * 0.9f + (float)current_pct * 0.1f;
-    }
-
-    return (int)(smoothed_pct + 0.5f);
+    int current_pct = battery_percent_from_mv(battery_get_voltage_mv());
+    return battery_filter_update(&pct_filter, current_pct);
 }
