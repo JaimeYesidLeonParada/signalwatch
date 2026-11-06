@@ -1,13 +1,10 @@
 #include "ui_clock.h"
+#include "clock_format.h"
 
 extern const lv_font_t nine_pin_70;
 
 static lv_obj_t * clock_label = NULL;
 static lv_obj_t * date_label = NULL;
-
-static const char *const DAY_NAMES[]   = {"Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"};
-static const char *const MONTH_NAMES[] = {"Ene", "Feb", "Mar", "Abr", "May", "Jun",
-                                          "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"};
 
 void ui_clock_update(lv_obj_t *scr, int hr, int min, int dow, int day, int month, bool valid)
 {
@@ -24,12 +21,8 @@ void ui_clock_update(lv_obj_t *scr, int hr, int min, int dow, int day, int month
         lv_obj_align(date_label, LV_ALIGN_TOP_LEFT, 10, 10);
     }
 
-    if (!valid) hr = min = 0;   // sin lectura del RTC: se muestra 12:00 y sin fecha
-
-    int hr12 = hr % 12;
-    if (hr12 == 0) hr12 = 12;
-
-    lv_label_set_text_fmt(clock_label, "%d:%02d", hr12, min);
-    if (valid) lv_label_set_text_fmt(date_label, "%s %d %s", DAY_NAMES[dow], day, MONTH_NAMES[month - 1]);
-    else       lv_label_set_text(date_label, "");
+    char time_text[CLOCK_TIME_LEN], date_text[CLOCK_DATE_LEN];
+    clock_format(hr, min, dow, day, month, valid, time_text, sizeof(time_text), date_text, sizeof(date_text));
+    lv_label_set_text(clock_label, time_text);
+    lv_label_set_text(date_label, date_text);
 }
