@@ -24,6 +24,10 @@ ESP-IDF v6.0. Todo el código en main/. CMakeLists.txt usa lista explícita de S
 
 Un módulo nuevo no incluye ui.h ni otros módulos de lógica (salvo alert\_dispatcher, que es el pegamento de la lógica de alertas: usa alert\_module y alert\_catalog, pero no ui ni el vibrador).
 
+\- Lógica pura (sin hardware, FreeRTOS ni LVGL) va en un archivo propio con su test en smartwatch\_project/tests (gcc + Unity en el PC, sin placa). Un test comprueba una sola funcionalidad; no se testean tareas, colas ni drivers, eso se prueba en el reloj. Un .c nuevo con test se agrega también a tests/CMakeLists.txt.
+
+\- Antes de cada commit correr tests/run\_tests.ps1: todos los tests deben pasar. Si un refactor los rompe, se corrige el código o se explica por qué cambia el test, nunca se borra el test para que pase.
+
 
 
 \## Módulos

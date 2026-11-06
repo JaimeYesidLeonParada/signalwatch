@@ -64,12 +64,42 @@ The firmware follows SOLID principles. Modules do not know each other: `app_init
 | Audio and AI | `bsp_es8311`, `ai_module`, `ei_wrapper`, `alert_module`, `alert_catalog`, `alert_dispatcher` |
 | Hardware | `display_hw`, `i2c_bus`, `touch_module`, `button_module`, `rtc_module`, `battery_module`, `vibrator_module` |
 | UI | `ui`, `ui_clock`, `ui_battery`, `ui_vu`, `ui_alerts`, `ui_notification` |
+| Pure logic (unit tested) | `morse`, `rtc_codec`, `battery_math`, `clock_format`, `audio_level`, `audio_preroll`, plus `alert_module` and `alert_catalog` |
+
+Logic that does not need hardware lives in its own file, so it can be tested on a PC. The hardware modules only call it. `alert_dispatcher` receives its outputs (UI and vibrator) from `app_init.c` instead of including them.
+
+## Tests
+
+The unit tests run on the PC with gcc and [Unity](https://github.com/ThrowTheSwitch/Unity). They need no board, no ESP-IDF and no FreeRTOS, and they finish in about a second. They cover the logic that can break without anyone noticing:
+
+| Test | What it protects |
+|---|---|
+| `alert_module` | Alert levels, 3-sample sliding window, per-class history |
+| `alert_catalog` | Unique labels, playable Morse text, ASCII-only screen text |
+| `morse` | Morse table and the timing of dots, dashes and gaps |
+| `rtc_codec` | RTC register decoding and range validation |
+| `battery_math` | Voltage to percentage, smoothing filter, charging threshold |
+| `clock_format` | 12-hour clock and date text |
+| `audio_level`, `audio_preroll` | Audio level and the pre-trigger buffer order |
+| `alert_dispatcher` | When to vibrate and notify, with fake outputs |
+
+You need gcc, CMake and Ninja. From `smartwatch_project`:
+
+```bash
+cmake -S tests -B tests/build -G Ninja
+cmake --build tests/build
+ctest --test-dir tests/build --output-on-failure
+```
+
+On Windows, `tests/run_tests.ps1` does the same and looks for the tools in the usual MSYS2 and ESP-IDF folders. The tests are plain CTest executables, so the Testing panel of VS Code (CMake Tools extension) shows them too.
+
+Every test checks one behavior. Drivers, tasks, queues and drawing are not unit tested: they are checked on the watch.
 
 ## Add a new sound class
 
 1. Train or extend the Edge Impulse model with the new label and replace the library in `smartwatch_project/components/ei_model`.
 2. Add one row to `CATALOG` in `alert_catalog.c` (label, Morse letter, icon glyph, three texts).
-3. Rebuild. Screen text must avoid accents, because the font has none.
+3. Rebuild and run the [tests](#tests). The catalog tests catch a repeated label, Morse text that cannot be played, and accents in screen text (the font has none).
 
 ## Roadmap
 
