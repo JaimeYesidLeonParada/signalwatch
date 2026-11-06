@@ -4,12 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "driver/i2c_master.h"
-
-// Hora tal como la guarda el chip. dow: 0=domingo..6=sabado; month: 1..12; year: 0..99.
-typedef struct {
-    uint8_t sec, min, hr;
-    uint8_t day, dow, month, year;
-} rtc_time_t;
+#include "rtc_codec.h"
 
 // Aviso periodico de la hora actual. Si valid es false no se pudo leer el chip y el
 // resto de los argumentos no tiene significado.
