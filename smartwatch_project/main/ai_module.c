@@ -9,18 +9,18 @@
 #include "esp_codec_dev.h"
 #include "esp_timer.h"
 #include "ei_wrapper.h"
+#include "audio_level.h"
+#include "audio_preroll.h"
 
 #define AUDIO_BUFFER_SIZE   16000   // 1 s @ 16 kHz (lo que exige el modelo)
-#define CHUNK_SAMPLES       1000
+#define CHUNK_SAMPLES       AUDIO_CHUNK_SAMPLES
 #define CHUNKS_PER_WINDOW   (AUDIO_BUFFER_SIZE / CHUNK_SAMPLES)
 
 #define CAPTURE_TASK_PRIORITY    5   // la mas alta: protege el margen del DMA
 #define CLASSIFY_TASK_PRIORITY   0   // la mas baja (idle): nunca bloquea al resto del sistema
 #define SOUND_THRESHOLD   15
-#define PRE_ROLL_CHUNKS   4   // ~250 ms de contexto antes del disparo (AJUSTAR con pruebas)
 
-static int16_t preroll_ring[PRE_ROLL_CHUNKS][CHUNK_SAMPLES];
-static int preroll_write_idx = 0;
+static audio_preroll_t preroll;
 static int16_t chunk_scratch[CHUNK_SAMPLES]; // buffer de lectura reutilizable, static para no gastar stack
 
 static const char *TAG = "ai_module";
@@ -51,27 +51,19 @@ static void audio_capture_task(void *arg) {
             continue;
         }
 
-        int64_t sum = 0;
-        for (int i = 0; i < CHUNK_SAMPLES; i++) sum += abs(chunk_scratch[i]);
-
-        int level = (int)((sum / CHUNK_SAMPLES) / 20);
-        if (level > 100) level = 100;
+        int level = audio_level_from_chunk(chunk_scratch, CHUNK_SAMPLES);
         if (listener.on_audio_level) listener.on_audio_level(level);
 
         if (!filling) {
-            memcpy(preroll_ring[preroll_write_idx], chunk_scratch, chunk_bytes);
-            preroll_write_idx = (preroll_write_idx + 1) % PRE_ROLL_CHUNKS;
+            audio_preroll_push(&preroll, chunk_scratch);
 
             if (level >= SOUND_THRESHOLD) {
                 xQueueReceive(buffer_free_queue, &buf_idx, portMAX_DELAY);
                 int16_t *dst = audio_buffers[buf_idx];
 
-                for (int i = 0; i < PRE_ROLL_CHUNKS; i++) {
-                    int ring_pos = (preroll_write_idx + i) % PRE_ROLL_CHUNKS; // del mas viejo al mas nuevo
-                    memcpy(dst + (i * CHUNK_SAMPLES), preroll_ring[ring_pos], chunk_bytes);
-                }
+                audio_preroll_copy_out(&preroll, dst);
 
-                chunks_filled = PRE_ROLL_CHUNKS;
+                chunks_filled = AUDIO_PREROLL_CHUNKS;
                 fill_start = esp_timer_get_time();
                 filling = true;
                 ESP_LOGI(TAG, "Disparo (nivel %d) -> buffer %d", level, buf_idx);
