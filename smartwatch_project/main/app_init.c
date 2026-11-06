@@ -38,9 +38,16 @@ void app_init(void)
     vibrator_init();
 
     // El dispatcher traduce los eventos de ai_module a UI y vibracion; debe existir
-    // antes de que arranque la captura.
+    // antes de que arranque la captura. Sus salidas necesitan la cola de ui y el vibrador.
     ei_wrapper_init();
-    alert_dispatcher_init();
+    const alert_outputs_t alert_outputs = {
+        .audio_level   = ui_post_audio_level_msg,
+        .inference     = ui_post_inference_msg,
+        .alert_icon    = ui_post_alert_icon_msg,
+        .notification  = ui_post_notification_msg,
+        .vibrate_morse = vibration_morse_play,
+    };
+    alert_dispatcher_init(&alert_outputs);
     const ai_listener_t ai_listener = {
         .on_audio_level    = alert_dispatcher_on_audio_level,
         .on_classification = alert_dispatcher_on_classification,

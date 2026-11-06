@@ -7,9 +7,20 @@
 extern "C" {
 #endif
 
+// A donde van las decisiones del dispatcher. app_init.c las conecta con ui y vibrator_module;
+// una salida en NULL se ignora.
+typedef struct {
+    void (*audio_level)(int level_pct);                      // nivel de cada chunk, tal cual llega
+    void (*inference)(const char *label, float confidence);  // la mejor clase de cada clasificacion
+    void (*alert_icon)(const char *label, int level);        // nivel (alert_level_t) de cada clase
+    void (*notification)(const char *text);                  // texto suelto en pantalla
+    void (*vibrate_morse)(const char *text);                 // texto a vibrar en morse
+} alert_outputs_t;
+
 // Politica de alertas: decide que mostrar y cuando vibrar a partir de lo que oye el reloj.
-// Es el unico lugar que conecta el audio con ui, vibrator, alert_module y alert_catalog.
-void alert_dispatcher_init(void);
+// Une alert_module y alert_catalog con las salidas que recibe; no conoce ui ni el vibrador.
+// outputs se copia, no hace falta que siga vivo despues de la llamada.
+void alert_dispatcher_init(const alert_outputs_t *outputs);
 
 // Nivel de audio (0-100) de cada chunk capturado. Debe llamarse siempre desde la
 // misma tarea, porque el dispatcher guarda el estado del flanco de "ruido fuerte".

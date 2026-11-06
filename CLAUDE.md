@@ -22,7 +22,7 @@ ESP-IDF v6.0. Todo el código en main/. CMakeLists.txt usa lista explícita de S
 
 \- Los módulos no se conocen entre sí: se conectan en app\_init.c (callbacks o parámetros).
 
-Un módulo nuevo no incluye ui.h ni otros módulos de lógica (salvo alert\_dispatcher, que es el pegamento).
+Un módulo nuevo no incluye ui.h ni otros módulos de lógica (salvo alert\_dispatcher, que es el pegamento de la lógica de alertas: usa alert\_module y alert\_catalog, pero no ui ni el vibrador).
 
 
 
@@ -42,7 +42,7 @@ comentado paso a paso ahí.
 
 \- alert\_catalog: datos por clase (label, morse, glifo, textos). Agregar una clase = una fila.
 
-\- alert\_dispatcher: traduce los eventos de ai\_module a UI y vibración.
+\- alert\_dispatcher: traduce los eventos de ai\_module a UI y vibración. Recibe la UI y el vibrador como salidas (alert\_outputs\_t) que conecta app\_init.c.
 
 \- vibrator\_module (morse), battery\_module, rtc\_module (PCF85063): entregan datos por
   callback, no incluyen ui.
