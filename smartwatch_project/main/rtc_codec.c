@@ -23,6 +23,17 @@ bool rtc_encode_registers(const wall_time_t *t, uint8_t raw[RTC_RAW_LEN])
     return true;
 }
 
+void rtc_time_to_wall_time(const rtc_time_t *in, wall_time_t *out)
+{
+    out->year   = (uint16_t)(2000 + in->year);
+    out->month  = in->month;
+    out->day    = in->day;
+    out->dow    = in->dow;
+    out->hour   = in->hr;
+    out->minute = in->min;
+    out->second = in->sec;
+}
+
 bool rtc_decode_registers(const uint8_t raw[RTC_RAW_LEN], rtc_time_t *out)
 {
     out->sec   = bcd2dec(raw[0] & 0x7F);

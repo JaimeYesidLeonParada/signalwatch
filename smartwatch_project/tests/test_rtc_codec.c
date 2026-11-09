@@ -185,9 +185,26 @@ static void test_rejected_time_leaves_the_buffer_untouched(void)
     for (int i = 0; i < RTC_RAW_LEN; i++) TEST_ASSERT_EQUAL_UINT8(0xAA, raw[i]);
 }
 
+// ---- rtc_time_to_wall_time ----
+
+static void test_rtc_time_converts_to_wall_time(void)
+{
+    rtc_time_t in = { .sec = 42, .min = 35, .hr = 14, .day = 17, .dow = 1, .month = 11, .year = 25 };
+    wall_time_t out;
+    rtc_time_to_wall_time(&in, &out);
+    TEST_ASSERT_EQUAL_UINT16(2025, out.year);
+    TEST_ASSERT_EQUAL_UINT8(11, out.month);
+    TEST_ASSERT_EQUAL_UINT8(17, out.day);
+    TEST_ASSERT_EQUAL_UINT8(1,  out.dow);
+    TEST_ASSERT_EQUAL_UINT8(14, out.hour);
+    TEST_ASSERT_EQUAL_UINT8(35, out.minute);
+    TEST_ASSERT_EQUAL_UINT8(42, out.second);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_rtc_time_converts_to_wall_time);
     RUN_TEST(test_encodes_a_known_time_as_bcd);
     RUN_TEST(test_encoded_time_decodes_to_the_same_time);
     RUN_TEST(test_encoded_seconds_clear_the_oscillator_flag);

@@ -17,6 +17,10 @@ void rtc_init(i2c_master_bus_handle_t bus_handle);
 // viene fuera de rango (hr 0-23, min 0-59, dow 0-6, day 1-31, month 1-12).
 bool rtc_get_time(rtc_time_t *out);
 
+// Lee la hora actual del chip en el formato neutro. Cumple time_source_t: false si falla la
+// lectura I2C o la hora guardada no es coherente.
+bool rtc_read_wall_time(wall_time_t *out);
+
 // Guarda la hora en el chip. Cumple time_sink_t: false si algun campo esta fuera de rango
 // (no se escribe nada) o si falla la escritura I2C.
 bool rtc_set_time(const wall_time_t *t);

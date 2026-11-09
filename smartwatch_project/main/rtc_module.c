@@ -54,6 +54,14 @@ bool rtc_get_time(rtc_time_t *out)
     return rtc_decode_registers(rx_data, out);
 }
 
+bool rtc_read_wall_time(wall_time_t *out)
+{
+    rtc_time_t t;
+    if (!rtc_get_time(&t)) return false;
+    rtc_time_to_wall_time(&t, out);
+    return true;
+}
+
 bool rtc_set_time(const wall_time_t *t)
 {
     // Buffer: [Registro inicial] + [Seg] + [Min] + [Hora] + [Dia] + [DiaSemana] + [Mes] + [Anio]

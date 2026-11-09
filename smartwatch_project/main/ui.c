@@ -6,6 +6,7 @@
 #include "ui_alerts.h"
 #include "ui_settings.h"
 #include "alert_urgent.h"
+#include "clock_format.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -18,6 +19,8 @@ static lv_disp_t * disp;
 // dibujan en main_scr, este o no visible, para que no aparezcan widgets en la de ajustes.
 static lv_obj_t * main_scr;
 static lv_obj_t * settings_scr;
+// De donde sale la hora que muestran los ajustes; la conecta app_init.c.
+static time_source_t time_source;
 
 typedef enum {
     UI_MSG_CLOCK,
@@ -110,6 +113,25 @@ static void on_swipe(lv_event_t *e)
     }
 }
 
+// Al empezar a mostrarse los ajustes se lee la hora actual y se pone en pantalla. Corre en
+// el hilo de LVGL, con el lock tomado.
+static void on_settings_open(lv_event_t *e)
+{
+    (void)e;
+    wall_time_t now;
+    bool valid = time_source != NULL && time_source(&now);
+
+    char time[CLOCK_TIME_LEN], ampm[CLOCK_AMPM_LEN], date[CLOCK_FULL_DATE_LEN];
+    clock_format_full(valid ? &now : NULL, valid, time, sizeof(time), ampm, sizeof(ampm),
+                      date, sizeof(date));
+    ui_settings_show_time(time, ampm, date);
+}
+
+void ui_set_time_source(time_source_t source)
+{
+    time_source = source;
+}
+
 void ui_start(lv_disp_t *display)
 {
     disp = display;
@@ -123,6 +145,8 @@ void ui_start(lv_disp_t *display)
     settings_scr = ui_settings_create();
     lv_obj_add_event_cb(main_scr, on_swipe, LV_EVENT_GESTURE, NULL);
     lv_obj_add_event_cb(settings_scr, on_swipe, LV_EVENT_GESTURE, NULL);
+    lv_obj_add_event_cb(settings_scr, on_settings_open, LV_EVENT_SCREEN_LOAD_START, NULL);
+    on_settings_open(NULL);   // deja la pantalla con texto desde el inicio
 
     ui_queue = xQueueCreate(5, sizeof(ui_msg_t));
     xTaskCreate(ui_task, "ui_task", 4096, NULL, 4, NULL);

@@ -29,6 +29,9 @@ bool rtc_decode_registers(const uint8_t raw[RTC_RAW_LEN], rtc_time_t *out);
 // el dia exista en ese mes: eso es responsabilidad de quien arma la fecha.
 bool rtc_encode_registers(const wall_time_t *t, uint8_t raw[RTC_RAW_LEN]);
 
+// Pasa una hora leida del chip (anio 0..99) al formato neutro de time_source/time_sink (anio 2000..2099).
+void rtc_time_to_wall_time(const rtc_time_t *in, wall_time_t *out);
+
 #ifdef __cplusplus
 }
 #endif
