@@ -102,9 +102,98 @@ static void test_blank_chip_frames_are_rejected(void)
     TEST_ASSERT_FALSE(rtc_decode_registers(ones, &t));
 }
 
+// ---- rtc_encode_registers ----
+
+// 2025-11-17 (lunes=1) 14:35:42
+static wall_time_t sample_time(void)
+{
+    wall_time_t t = { .year = 2025, .month = 11, .day = 17, .dow = 1,
+                      .hour = 14, .minute = 35, .second = 42 };
+    return t;
+}
+
+static void test_encodes_a_known_time_as_bcd(void)
+{
+    wall_time_t t = sample_time();
+    uint8_t raw[RTC_RAW_LEN];
+    TEST_ASSERT_TRUE(rtc_encode_registers(&t, raw));
+    const uint8_t expected[RTC_RAW_LEN] = { 0x42, 0x35, 0x14, 0x17, 0x01, 0x11, 0x25 };
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, raw, RTC_RAW_LEN);
+}
+
+// Lo que se escribe es lo que se lee de vuelta.
+static void test_encoded_time_decodes_to_the_same_time(void)
+{
+    wall_time_t t = sample_time();
+    uint8_t raw[RTC_RAW_LEN];
+    rtc_time_t back;
+    TEST_ASSERT_TRUE(rtc_encode_registers(&t, raw));
+    TEST_ASSERT_TRUE(rtc_decode_registers(raw, &back));
+    TEST_ASSERT_EQUAL_UINT8(42, back.sec);
+    TEST_ASSERT_EQUAL_UINT8(35, back.min);
+    TEST_ASSERT_EQUAL_UINT8(14, back.hr);
+    TEST_ASSERT_EQUAL_UINT8(17, back.day);
+    TEST_ASSERT_EQUAL_UINT8(1,  back.dow);
+    TEST_ASSERT_EQUAL_UINT8(11, back.month);
+    TEST_ASSERT_EQUAL_UINT8(25, back.year);
+}
+
+// Escribir segundos con el bit 7 en 0 limpia la bandera de "oscilador parado".
+static void test_encoded_seconds_clear_the_oscillator_flag(void)
+{
+    wall_time_t t = sample_time();
+    t.second = 59;
+    uint8_t raw[RTC_RAW_LEN];
+    TEST_ASSERT_TRUE(rtc_encode_registers(&t, raw));
+    TEST_ASSERT_EQUAL_UINT8(0, raw[SEC] & 0x80);
+}
+
+static void test_encode_accepts_the_range_limits(void)
+{
+    wall_time_t first = { 2000, 1, 1, 0, 0, 0, 0 };
+    wall_time_t last  = { 2099, 12, 31, 6, 23, 59, 59 };
+    uint8_t raw[RTC_RAW_LEN];
+    TEST_ASSERT_TRUE(rtc_encode_registers(&first, raw));
+    TEST_ASSERT_TRUE(rtc_encode_registers(&last, raw));
+    TEST_ASSERT_EQUAL_UINT8(0x99, raw[YEAR]);
+}
+
+static void test_encode_rejects_each_out_of_range_field(void)
+{
+    uint8_t raw[RTC_RAW_LEN];
+    wall_time_t t;
+    t = sample_time(); t.year = 1999;  TEST_ASSERT_FALSE_MESSAGE(rtc_encode_registers(&t, raw), "anio 1999");
+    t = sample_time(); t.year = 2100;  TEST_ASSERT_FALSE_MESSAGE(rtc_encode_registers(&t, raw), "anio 2100");
+    t = sample_time(); t.month = 0;    TEST_ASSERT_FALSE_MESSAGE(rtc_encode_registers(&t, raw), "mes 0");
+    t = sample_time(); t.month = 13;   TEST_ASSERT_FALSE_MESSAGE(rtc_encode_registers(&t, raw), "mes 13");
+    t = sample_time(); t.day = 0;      TEST_ASSERT_FALSE_MESSAGE(rtc_encode_registers(&t, raw), "dia 0");
+    t = sample_time(); t.day = 32;     TEST_ASSERT_FALSE_MESSAGE(rtc_encode_registers(&t, raw), "dia 32");
+    t = sample_time(); t.dow = 7;      TEST_ASSERT_FALSE_MESSAGE(rtc_encode_registers(&t, raw), "dia de semana 7");
+    t = sample_time(); t.hour = 24;    TEST_ASSERT_FALSE_MESSAGE(rtc_encode_registers(&t, raw), "hora 24");
+    t = sample_time(); t.minute = 60;  TEST_ASSERT_FALSE_MESSAGE(rtc_encode_registers(&t, raw), "minuto 60");
+    t = sample_time(); t.second = 60;  TEST_ASSERT_FALSE_MESSAGE(rtc_encode_registers(&t, raw), "segundo 60");
+}
+
+// Una hora rechazada no debe dejar basura en el buffer que se iba a escribir.
+static void test_rejected_time_leaves_the_buffer_untouched(void)
+{
+    wall_time_t t = sample_time();
+    t.hour = 24;
+    uint8_t raw[RTC_RAW_LEN];
+    memset(raw, 0xAA, sizeof(raw));
+    TEST_ASSERT_FALSE(rtc_encode_registers(&t, raw));
+    for (int i = 0; i < RTC_RAW_LEN; i++) TEST_ASSERT_EQUAL_UINT8(0xAA, raw[i]);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_encodes_a_known_time_as_bcd);
+    RUN_TEST(test_encoded_time_decodes_to_the_same_time);
+    RUN_TEST(test_encoded_seconds_clear_the_oscillator_flag);
+    RUN_TEST(test_encode_accepts_the_range_limits);
+    RUN_TEST(test_encode_rejects_each_out_of_range_field);
+    RUN_TEST(test_rejected_time_leaves_the_buffer_untouched);
     RUN_TEST(test_decodes_a_known_frame);
     RUN_TEST(test_control_bits_are_not_part_of_the_time);
     RUN_TEST(test_range_limits_are_accepted);

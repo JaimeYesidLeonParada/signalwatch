@@ -1,14 +1,15 @@
 #include "rtc_module.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_log.h"
+
+static const char *TAG = "rtc";
 
 #define PCF85063_ADDR 0x51
 #define CLOCK_TASK_PRIORITY   1
 #define CLOCK_UPDATE_MS       (1 * 60 * 1000)
 
 static i2c_master_dev_handle_t rtc_dev_handle;
-
-static uint8_t dec2bcd(uint8_t val) { return ((val / 10 * 16) + (val % 10)); }
 
 static rtc_clock_cb_t clock_cb;
 
@@ -53,22 +54,21 @@ bool rtc_get_time(rtc_time_t *out)
     return rtc_decode_registers(rx_data, out);
 }
 
-void rtc_set_time(uint16_t year, uint8_t month, uint8_t day, uint8_t dow, uint8_t hr, uint8_t min, uint8_t sec)
+bool rtc_set_time(const wall_time_t *t)
 {
-    // El PCF85063 guarda el año de 0 a 99
-    if (year >= 2000) year -= 2000;
-
-    // Buffer: [Registro inicial] + [Seg] + [Min] + [Hora] + [Día] + [DíaSemana] + [Mes] + [Año]
-    uint8_t write_data[8];
+    // Buffer: [Registro inicial] + [Seg] + [Min] + [Hora] + [Dia] + [DiaSemana] + [Mes] + [Anio]
+    uint8_t write_data[1 + RTC_RAW_LEN];
     write_data[0] = 0x04; // Registro 0x04 (Segundos)
-    
-    write_data[1] = dec2bcd(sec);
-    write_data[2] = dec2bcd(min);
-    write_data[3] = dec2bcd(hr);
-    write_data[4] = dec2bcd(day);
-    write_data[5] = dec2bcd(dow);
-    write_data[6] = dec2bcd(month);
-    write_data[7] = dec2bcd((uint8_t)year);
+
+    if (!rtc_encode_registers(t, &write_data[1])) {
+        ESP_LOGW(TAG, "hora fuera de rango, no se escribe");
+        return false;
+    }
 
     esp_err_t err = i2c_master_transmit(rtc_dev_handle, write_data, sizeof(write_data), -1);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "fallo al escribir la hora: %s", esp_err_to_name(err));
+        return false;
+    }
+    return true;
 }
