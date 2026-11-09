@@ -5,6 +5,7 @@
 #include "ui_vu.h"
 #include "ui_alerts.h"
 #include "ui_settings.h"
+#include "alert_urgent.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -57,6 +58,12 @@ static void ui_handle_msg(const ui_msg_t *msg)
         break;
 
         case UI_MSG_INFERENCE:
+        // Una alerta muy clara saca al usuario de los ajustes; el resto espera a que el
+        // usuario vuelva (la vibracion avisa igual).
+        if (alert_is_urgent(msg->data.inference.label, msg->data.inference.confidence) &&
+            lv_screen_active() == settings_scr) {
+            lv_screen_load(main_scr);
+        }
         ui_notification_show_inference(scr, msg->data.inference.label, msg->data.inference.confidence);
         break;
 
