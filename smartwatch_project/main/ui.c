@@ -4,6 +4,7 @@
 #include "ui_notification.h"
 #include "ui_vu.h"
 #include "ui_alerts.h"
+#include "ui_settings.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -12,6 +13,10 @@
 #include "esp_lvgl_port.h"
 
 static lv_disp_t * disp;
+// Dos pantallas: la principal (reloj y alertas) y la de ajustes. Los mensajes siempre se
+// dibujan en main_scr, este o no visible, para que no aparezcan widgets en la de ajustes.
+static lv_obj_t * main_scr;
+static lv_obj_t * settings_scr;
 
 typedef enum {
     UI_MSG_CLOCK,
@@ -39,7 +44,7 @@ static QueueHandle_t ui_queue = NULL;
 // Unico lugar que dibuja: se llama desde ui_task con el lock de LVGL tomado.
 static void ui_handle_msg(const ui_msg_t *msg)
 {
-    lv_obj_t * scr = lv_disp_get_scr_act(disp);
+    lv_obj_t * scr = main_scr;
 
     switch (msg->type) {
         case UI_MSG_CLOCK:
@@ -82,12 +87,35 @@ static void ui_task(void *arg)
     }
 }
 
+// Deslizar el dedo hacia la izquierda en la principal abre los ajustes; hacia la derecha
+// en los ajustes vuelve. La pantalla nueva entra por el lado contrario al del dedo.
+static void on_swipe(lv_event_t *e)
+{
+    lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_active());
+    lv_obj_t *target = lv_event_get_target(e);
+
+    if (target == main_scr && dir == LV_DIR_LEFT) {
+        lv_indev_wait_release(lv_indev_active());
+        lv_screen_load_anim(settings_scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, 250, 0, false);
+    } else if (target == settings_scr && dir == LV_DIR_RIGHT) {
+        lv_indev_wait_release(lv_indev_active());
+        lv_screen_load_anim(main_scr, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 250, 0, false);
+    }
+}
+
 void ui_start(lv_disp_t *display)
 {
     disp = display;
-    lv_obj_t * scr = lv_disp_get_scr_act(disp);
+    main_scr = lv_disp_get_scr_act(disp);
+    lv_obj_t * scr = main_scr;
     lv_obj_set_style_bg_color(scr, lv_color_hex(0x000000), LV_PART_MAIN);
     ui_alerts_create(scr, ui_vu_create(scr));
+
+    // Sin scroll en las pantallas: si no, el dedo las desplaza en vez de dar un gesto.
+    lv_obj_remove_flag(main_scr, LV_OBJ_FLAG_SCROLLABLE);
+    settings_scr = ui_settings_create();
+    lv_obj_add_event_cb(main_scr, on_swipe, LV_EVENT_GESTURE, NULL);
+    lv_obj_add_event_cb(settings_scr, on_swipe, LV_EVENT_GESTURE, NULL);
 
     ui_queue = xQueueCreate(5, sizeof(ui_msg_t));
     xTaskCreate(ui_task, "ui_task", 4096, NULL, 4, NULL);
