@@ -15,6 +15,14 @@ extern "C" {
 #define TIME_EDIT_YEAR_MIN 2000
 #define TIME_EDIT_YEAR_MAX 2099   // el PCF85063 guarda el anio en 2 digitos
 
+// Fecha y hora desde la que se empieza a editar cuando el RTC no da una hora valida.
+// Es la misma que muestra clock_format_full en ese caso.
+#define TIME_EDIT_DEFAULT_YEAR   2026
+#define TIME_EDIT_DEFAULT_MONTH  1
+#define TIME_EDIT_DEFAULT_DAY    1
+#define TIME_EDIT_DEFAULT_HOUR   0
+#define TIME_EDIT_DEFAULT_MINUTE 0
+
 typedef enum {
     TIME_FIELD_HOUR = 0,
     TIME_FIELD_MINUTE,

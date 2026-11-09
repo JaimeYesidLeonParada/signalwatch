@@ -7,6 +7,7 @@
 #include "ui_settings.h"
 #include "alert_urgent.h"
 #include "clock_format.h"
+#include "time_edit.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -113,18 +114,53 @@ static void on_swipe(lv_event_t *e)
     }
 }
 
-// Al empezar a mostrarse los ajustes se lee la hora actual y se pone en pantalla. Corre en
-// el hilo de LVGL, con el lock tomado.
+// Hora y fecha que el usuario esta editando en los ajustes. Todo corre en el hilo de LVGL,
+// con el lock tomado.
+static time_edit_t edit;
+
+// Dibuja en los ajustes el estado actual de la edicion.
+static void render_settings(void)
+{
+    wall_time_t t = {
+        .year = edit.year, .month = edit.month, .day = edit.day,
+        .dow = (uint8_t)time_edit_weekday(edit.year, edit.month, edit.day),
+        .hour = edit.hour, .minute = edit.minute, .second = 0,
+    };
+    char time[CLOCK_TIME_LEN], ampm[CLOCK_AMPM_LEN], date[CLOCK_FULL_DATE_LEN];
+    clock_format_full(&t, true, time, sizeof(time), ampm, sizeof(ampm), date, sizeof(date));
+
+    settings_field_t selected = SETTINGS_FIELD_NONE;
+    if (edit.field == TIME_FIELD_HOUR)   selected = SETTINGS_FIELD_HOUR;
+    if (edit.field == TIME_FIELD_MINUTE) selected = SETTINGS_FIELD_MINUTE;
+    ui_settings_show_time(time, ampm, date, selected);
+}
+
+// Traduce lo que hace el usuario en la pantalla a operaciones de time_edit.
+static void on_settings_input(settings_input_t input)
+{
+    switch (input) {
+        case SETTINGS_INPUT_SELECT_HOUR:   edit.field = TIME_FIELD_HOUR;   break;
+        case SETTINGS_INPUT_SELECT_MINUTE: edit.field = TIME_FIELD_MINUTE; break;
+        case SETTINGS_INPUT_INCREMENT:     time_edit_increment(&edit);     break;
+        case SETTINGS_INPUT_DECREMENT:     time_edit_decrement(&edit);     break;
+    }
+    render_settings();
+}
+
+// Al empezar a mostrarse los ajustes se lee la hora actual del RTC y se empieza a editar
+// desde ella (o desde la hora por defecto si no hay una valida). Lo que se edito antes y no
+// se guardo se descarta.
 static void on_settings_open(lv_event_t *e)
 {
     (void)e;
     wall_time_t now;
-    bool valid = time_source != NULL && time_source(&now);
-
-    char time[CLOCK_TIME_LEN], ampm[CLOCK_AMPM_LEN], date[CLOCK_FULL_DATE_LEN];
-    clock_format_full(valid ? &now : NULL, valid, time, sizeof(time), ampm, sizeof(ampm),
-                      date, sizeof(date));
-    ui_settings_show_time(time, ampm, date);
+    if (time_source != NULL && time_source(&now)) {
+        time_edit_init(&edit, now.year, now.month, now.day, now.hour, now.minute);
+    } else {
+        time_edit_init(&edit, TIME_EDIT_DEFAULT_YEAR, TIME_EDIT_DEFAULT_MONTH,
+                       TIME_EDIT_DEFAULT_DAY, TIME_EDIT_DEFAULT_HOUR, TIME_EDIT_DEFAULT_MINUTE);
+    }
+    render_settings();
 }
 
 void ui_set_time_source(time_source_t source)
@@ -142,7 +178,7 @@ void ui_start(lv_disp_t *display)
 
     // Sin scroll en las pantallas: si no, el dedo las desplaza en vez de dar un gesto.
     lv_obj_remove_flag(main_scr, LV_OBJ_FLAG_SCROLLABLE);
-    settings_scr = ui_settings_create();
+    settings_scr = ui_settings_create(on_settings_input);
     lv_obj_add_event_cb(main_scr, on_swipe, LV_EVENT_GESTURE, NULL);
     lv_obj_add_event_cb(settings_scr, on_swipe, LV_EVENT_GESTURE, NULL);
     lv_obj_add_event_cb(settings_scr, on_settings_open, LV_EVENT_SCREEN_LOAD_START, NULL);
