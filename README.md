@@ -19,6 +19,11 @@
 - **Morse vibration.** Each class has its own letter (A, B, F) played on the vibration motor, so you can tell the alert apart without looking.
 - **Live feedback on screen:** audio level meter, one icon per class, clock with date, and battery indicator.
 - **Always-on clock** backed by a PCF85063 RTC.
+- **Set the time and date on the watch.** Swipe left on the main screen to open the settings screen, tap hour, minute, month or year to select it, adjust it with the large "-" and "+" buttons (hold to repeat) and tap the red check to save it to the RTC. Swipe right to go back without saving. A very confident alert (above 90 %) takes you back to the main screen on its own.
+
+<p align="center">
+  <img src="docs/settings-screen.jpg" alt="Settings screen to set the time and date" width="360">
+</p>
 
 ## Hardware
 
@@ -63,10 +68,21 @@ The firmware follows SOLID principles. Modules do not know each other: `app_init
 | Composition root | `app_init.c` |
 | Audio and AI | `bsp_es8311`, `ai_module`, `ei_wrapper`, `alert_module`, `alert_catalog`, `alert_dispatcher` |
 | Hardware | `display_hw`, `i2c_bus`, `touch_module`, `button_module`, `rtc_module`, `battery_module`, `vibrator_module` |
-| UI | `ui`, `ui_clock`, `ui_battery`, `ui_vu`, `ui_alerts`, `ui_notification` |
-| Pure logic (unit tested) | `morse`, `rtc_codec`, `battery_math`, `clock_format`, `audio_level`, `audio_preroll`, plus `alert_module` and `alert_catalog` |
+| UI | `ui`, `ui_clock`, `ui_battery`, `ui_vu`, `ui_alerts`, `ui_notification`, `ui_settings` |
+| Pure logic (unit tested) | `morse`, `rtc_codec`, `battery_math`, `clock_format`, `audio_level`, `audio_preroll`, `time_edit`, `alert_urgent`, plus `alert_module` and `alert_catalog` |
 
 Logic that does not need hardware lives in its own file, so it can be tested on a PC. The hardware modules only call it. `alert_dispatcher` receives its outputs (UI and vibrator) from `app_init.c` instead of including them.
+
+### Setting the time
+
+The time-setting feature is split so that each part can change without touching the others:
+
+- `time_edit`: pure editing state (hour, minute, day, month, year). It is always a valid date, so saving never needs to validate.
+- `time_source.h` / `time_sink.h`: neutral read and write interfaces for the time. The RTC implements both today; a WiFi/NTP source could replace it later without changing the UI.
+- `ui_settings`: only widgets. It reports abstract inputs (select field, increment, decrement, save), so touch and the physical buttons can drive the same screen.
+- `ui.c`: maps those inputs to `time_edit` and writes through the sink. `app_init.c` connects the RTC as source and sink.
+
+All LVGL calls made outside the LVGL task, including widget creation in `ui_start` and the touch registration in `touch_init`, are wrapped in `lvgl_port_lock`.
 
 ## Tests
 
@@ -80,6 +96,8 @@ The unit tests run on the PC with gcc and [Unity](https://github.com/ThrowTheSwi
 | `rtc_codec` | RTC register decoding and range validation |
 | `battery_math` | Voltage to percentage, smoothing filter, charging threshold |
 | `clock_format` | 12-hour clock and date text |
+| `time_edit` | Editing hour, minute, day, month and year: wrap-around, month lengths, leap years, weekday |
+| `alert_urgent` | Which alerts are urgent enough to leave the settings screen |
 | `audio_level`, `audio_preroll` | Audio level and the pre-trigger buffer order |
 | `alert_dispatcher` | When to vibrate and notify, with fake outputs |
 
@@ -105,10 +123,12 @@ Every test checks one behavior. Drivers, tasks, queues and drawing are not unit 
 
 Planned work is tracked in [Issues](https://github.com/JaimeYesidLeonParada/signalwatch/issues):
 
-- Set date and time from the watch
+- Physical buttons (including editing the time with them)
+- Button on the main screen to open the settings
 - User-facing battery settings
-- Take the LVGL lock when registering the touch input device
 - More sound classes
+
+Done: set date and time from the watch (touch), LVGL lock when registering the touch input device.
 
 ## License
 

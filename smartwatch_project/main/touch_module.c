@@ -1,6 +1,7 @@
 #include "touch_module.h"
 #include "esp_log.h"
 #include "lvgl.h"
+#include "esp_lvgl_port.h"
 
 #define CST816_ADDR 0x15 // Dirección estándar I2C de la familia CST816
 
@@ -46,11 +47,17 @@ void touch_init(i2c_master_bus_handle_t bus_handle, lv_disp_t *disp)
     };
     ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_cfg, &touch_dev_handle));
 
-    // Sintaxis moderna de LVGL v9 para registrar el touch
+    // La tarea de LVGL ya esta corriendo: registrar el indev sin su lock puede corromper su
+    // estado interno (mismo problema que hubo en ui_start). Se registra entre lock y unlock.
+    if (!lvgl_port_lock(-1)) {
+        ESP_LOGE(TAG, "No se pudo tomar el lock de LVGL: touch no registrado");
+        return;
+    }
     lv_indev_t * indev = lv_indev_create();
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(indev, touch_read_cb);
     lv_indev_set_display(indev, disp);
-    
+    lvgl_port_unlock();
+
     ESP_LOGI(TAG, "Driver Touch registrado en LVGL v9 con éxito.");
 }
