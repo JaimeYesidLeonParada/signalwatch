@@ -1,7 +1,8 @@
 #include "ui_settings.h"
 #include <string.h>
 
-extern const lv_font_t nine_pin_70;
+// Fuente de la hora: Nine Pin de 56 px, solo digitos y ':' (nine_pin_70 es la del reloj principal).
+extern const lv_font_t nine_pin_56;
 
 #define COLOR_TEXT      0xFFFFFF
 #define COLOR_SELECTED  0xFFB000   // borde de la zona seleccionada
@@ -57,9 +58,9 @@ static lv_obj_t *new_zone(lv_obj_t *parent, int x, int y, int w, int h)
 // Zona de hora o minutos: con la fuente grande dentro.
 static lv_obj_t *new_field(lv_obj_t *scr, int x, settings_input_t input, lv_obj_t **label)
 {
-    lv_obj_t *zone = new_zone(scr, x, 28, 95, 90);
+    lv_obj_t *zone = new_zone(scr, x, 38, 80, 74);
     lv_obj_add_event_cb(zone, on_field_clicked, LV_EVENT_CLICKED, (void *)(intptr_t)input);
-    *label = new_label(zone, &nine_pin_70);
+    *label = new_label(zone, &nine_pin_56);
     lv_obj_remove_flag(*label, LV_OBJ_FLAG_CLICKABLE);   // el toque lo recibe la zona
     lv_obj_center(*label);
     return zone;
@@ -68,7 +69,7 @@ static lv_obj_t *new_field(lv_obj_t *scr, int x, settings_input_t input, lv_obj_
 // Boton grande con "+" o "-" dibujado con barras, para no depender de la fuente.
 static void new_step_button(lv_obj_t *scr, int x, bool plus, settings_input_t input)
 {
-    lv_obj_t *btn = new_zone(scr, x, 198, 105, 74);
+    lv_obj_t *btn = new_zone(scr, x, 190, 90, 60);
     lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_bg_color(btn, lv_color_hex(COLOR_BUTTON), LV_PART_MAIN);
     lv_obj_set_style_bg_color(btn, lv_color_hex(COLOR_PRESSED), LV_PART_MAIN | LV_STATE_PRESSED);
@@ -80,7 +81,7 @@ static void new_step_button(lv_obj_t *scr, int x, bool plus, settings_input_t in
         lv_obj_t *bar = lv_obj_create(btn);
         lv_obj_remove_flag(bar, LV_OBJ_FLAG_CLICKABLE);   // el toque lo recibe el boton
         lv_obj_remove_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_set_size(bar, i == 0 ? 44 : 8, i == 0 ? 8 : 44);
+        lv_obj_set_size(bar, i == 0 ? 36 : 7, i == 0 ? 7 : 36);
         lv_obj_set_style_border_width(bar, 0, LV_PART_MAIN);
         lv_obj_set_style_radius(bar, 4, LV_PART_MAIN);
         lv_obj_set_style_bg_color(bar, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
@@ -100,28 +101,23 @@ lv_obj_t *ui_settings_create(settings_input_cb_t on_input)
 
     lv_obj_t *title = new_label(scr, NULL);
     lv_label_set_text(title, "AJUSTES");
-    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 6);
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 10);
 
-    // Hora y minutos son dos zonas tocables; los ':' van entre ellas (la fuente solo tiene
-    // digitos, ':', A, P y M).
-    hour_box   = new_field(scr, 5,   SETTINGS_INPUT_SELECT_HOUR,   &hour_label);
-    minute_box = new_field(scr, 140, SETTINGS_INPUT_SELECT_MINUTE, &minute_label);
-    lv_obj_t *colon = new_label(scr, &nine_pin_70);
+    // Hora y minutos son dos zonas tocables; los ':' van entre ellas.
+    hour_box   = new_field(scr, 18,  SETTINGS_INPUT_SELECT_HOUR,   &hour_label);
+    minute_box = new_field(scr, 142, SETTINGS_INPUT_SELECT_MINUTE, &minute_label);
+    lv_obj_t *colon = new_label(scr, &nine_pin_56);
     lv_label_set_text(colon, ":");
     lv_obj_remove_flag(colon, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_align(colon, LV_ALIGN_TOP_MID, 0, 28 + 10);
+    lv_obj_align(colon, LV_ALIGN_TOP_MID, 0, 38 + 13);
 
     ampm_label = new_label(scr, NULL);
     date_label = new_label(scr, NULL);
-    lv_obj_align(ampm_label, LV_ALIGN_TOP_MID, 0, 122);
-    lv_obj_align(date_label, LV_ALIGN_TOP_MID, 0, 146);
+    lv_obj_align(ampm_label, LV_ALIGN_TOP_MID, 0, 116);
+    lv_obj_align(date_label, LV_ALIGN_TOP_MID, 0, 140);
 
-    lv_obj_t *hint = new_label(scr, NULL);
-    lv_label_set_text(hint, "Desliza para volver");
-    lv_obj_align(hint, LV_ALIGN_TOP_MID, 0, 172);
-
-    new_step_button(scr, 10,  false, SETTINGS_INPUT_DECREMENT);
-    new_step_button(scr, 125, true,  SETTINGS_INPUT_INCREMENT);
+    new_step_button(scr, 20,  false, SETTINGS_INPUT_DECREMENT);
+    new_step_button(scr, 130, true,  SETTINGS_INPUT_INCREMENT);
 
     return scr;
 }
