@@ -3,12 +3,11 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
-#include "vibrator_module.h"
 
 #define BOOT_BUTTON_PIN 9
-#define BUTTON_PULSE_MS 100
 
 static const char *TAG = "button_module";
+static button_cb_t press_cb;
 
 static void button_task(void *arg)
 {
@@ -21,9 +20,10 @@ static void button_task(void *arg)
         // Si el estado actual es 0 (presionado) y el anterior era 1 (suelto)
         if (current_state == 0 && last_state == 1) {
             ESP_LOGI(TAG, "¡Botón BOOT presionado!");
-            
-            // Activamos el vibrador
-            vibrator_pulse(BUTTON_PULSE_MS);
+
+            if (press_cb != NULL) {
+                press_cb();
+            }
         }
         
         last_state = current_state;
@@ -31,8 +31,9 @@ static void button_task(void *arg)
     }
 }
 
-void button_init(void)
+void button_init(button_cb_t on_press)
 {
+    press_cb = on_press;
     ESP_LOGI(TAG, "Inicializando botón BOOT...");
     
     // Configuramos el pin 9 como entrada con Pull-up interno

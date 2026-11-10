@@ -37,6 +37,7 @@ typedef enum {
     UI_MSG_ALERT_ICON,
     UI_MSG_NOTIFICATION,
     UI_MSG_WAKE,
+    UI_MSG_BUTTON,
 } ui_msg_type_t;
 
 typedef struct {
@@ -52,6 +53,7 @@ typedef struct {
 } ui_msg_t;
 
 static QueueHandle_t ui_queue = NULL;
+static void (*button_feedback)(void);
 
 // Unico lugar que dibuja: se llama desde ui_task con el lock de LVGL tomado.
 static void ui_handle_msg(const ui_msg_t *msg)
@@ -92,6 +94,13 @@ static void ui_handle_msg(const ui_msg_t *msg)
 
         case UI_MSG_WAKE:
         ui_sleep_activity();
+        break;
+
+        case UI_MSG_BUTTON:
+        // Con la pantalla apagada el boton solo la enciende; con ella encendida da feedback.
+        if (!ui_sleep_activity() && button_feedback != NULL) {
+            button_feedback();
+        }
         break;
     }
 }
@@ -209,6 +218,11 @@ void ui_set_time_sink(time_sink_t sink)
     time_sink = sink;
 }
 
+void ui_set_button_feedback(void (*feedback)(void))
+{
+    button_feedback = feedback;
+}
+
 void ui_set_display_power(display_power_t power)
 {
     ui_sleep_set_power(power);
@@ -265,6 +279,12 @@ void ui_post_notification_msg(const char *text)
 void ui_post_wake_msg(void)
 {
     ui_msg_t msg = { .type = UI_MSG_WAKE };
+    xQueueSend(ui_queue, &msg, 0);
+}
+
+void ui_post_button_msg(void)
+{
+    ui_msg_t msg = { .type = UI_MSG_BUTTON };
     xQueueSend(ui_queue, &msg, 0);
 }
 

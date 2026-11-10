@@ -25,6 +25,11 @@ void ui_set_time_sink(time_sink_t sink);
 // la pantalla no se apaga sola.
 void ui_set_display_power(display_power_t power);
 
+// Que se hace cuando se pulsa un boton con la pantalla ya encendida (la conecta app_init.c; por
+// ejemplo una vibracion corta). Con la pantalla apagada el boton solo la enciende y esto no se
+// llama. Se llama desde el hilo de LVGL.
+void ui_set_button_feedback(void (*feedback)(void));
+
 // Misma firma que rtc_clock_cb_t. dow: 0=domingo; si valid es false se muestra la hora en 12:00 y sin fecha.
 void ui_post_clock_msg(int hour, int min, int dow, int day, int month, bool valid);
 void ui_post_battery_msg(int bat_pct, bool is_charging);
@@ -35,6 +40,9 @@ void ui_post_notification_msg(const char *text);
 
 // Pide que la pantalla este encendida (si estaba apagada por inactividad se enciende).
 void ui_post_wake_msg(void);
+
+// Se pulso un boton fisico: enciende la pantalla si estaba apagada, o da el feedback del boton.
+void ui_post_button_msg(void);
 
 #ifdef __cplusplus
 }

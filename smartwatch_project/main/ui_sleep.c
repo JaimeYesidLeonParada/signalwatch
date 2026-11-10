@@ -21,11 +21,13 @@ static void wake(void)
     }
 }
 
-void ui_sleep_activity(void)
+bool ui_sleep_activity(void)
 {
-    if (screen_policy_activity(&policy, lv_tick_get())) {
+    bool woke = screen_policy_activity(&policy, lv_tick_get());
+    if (woke) {
         wake();
     }
+    return woke;
 }
 
 // Toque con la pantalla apagada: solo despierta. El resto de ese toque (soltar, deslizar) se

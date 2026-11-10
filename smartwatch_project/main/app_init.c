@@ -12,6 +12,14 @@
 #include "alert_dispatcher.h"
 #include "vibrator_module.h"
 
+#define BUTTON_PULSE_MS 100
+
+// Feedback del boton con la pantalla encendida: una vibracion corta.
+static void button_feedback(void)
+{
+    vibrator_pulse(BUTTON_PULSE_MS);
+}
+
 // Composition root: aqui se crean los modulos y se conectan entre si. El orden
 // importa, cada paso indica de que depende.
 void app_init(void)
@@ -35,7 +43,8 @@ void app_init(void)
     ui_set_time_sink(rtc_set_time);          // ...y guardan en el RTC la que el usuario edita
     touch_init(bus_handle, disp);
 
-    button_init();
+    ui_set_button_feedback(button_feedback);
+    button_init(ui_post_button_msg);   // necesita la cola de ui
     battery_init();
     battery_start(ui_post_battery_msg);   // necesita la cola de ui
     vibrator_init();

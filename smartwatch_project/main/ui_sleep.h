@@ -19,7 +19,8 @@ void ui_sleep_create(lv_display_t *display, ui_sleep_cb_t on_sleep);
 void ui_sleep_set_power(display_power_t power);
 
 // Hubo actividad que no es un toque (boton, gesto, alerta): enciende la pantalla si estaba
-// apagada y reinicia la cuenta. Los toques los detecta este modulo por su cuenta.
-void ui_sleep_activity(void);
+// apagada y reinicia la cuenta. Devuelve true si estaba apagada y acaba de encenderse. Los
+// toques los detecta este modulo por su cuenta.
+bool ui_sleep_activity(void);
 
 #endif // UI_SLEEP_H
