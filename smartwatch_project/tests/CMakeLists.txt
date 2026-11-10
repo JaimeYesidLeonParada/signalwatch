@@ -41,3 +41,4 @@ add_unit_test(alert_dispatcher alert_dispatcher.c alert_module.c alert_catalog.c
 add_unit_test(time_edit time_edit.c)
 add_unit_test(alert_urgent alert_urgent.c alert_catalog.c)
 add_unit_test(screen_policy screen_policy.c)
+add_unit_test(wrist_gesture wrist_gesture.c)
