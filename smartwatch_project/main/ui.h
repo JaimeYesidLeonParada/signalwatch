@@ -33,6 +33,9 @@ void ui_post_audio_level_msg(int level_pct);
 void ui_post_alert_icon_msg(const char *label, int level); 
 void ui_post_notification_msg(const char *text);
 
+// Pide que la pantalla este encendida (si estaba apagada por inactividad se enciende).
+void ui_post_wake_msg(void);
+
 #ifdef __cplusplus
 }
 #endif

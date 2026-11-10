@@ -15,6 +15,7 @@ typedef struct {
     void (*alert_icon)(const char *label, int level);        // nivel (alert_level_t) de cada clase
     void (*notification)(const char *text);                  // texto suelto en pantalla
     void (*vibrate_morse)(const char *text);                 // texto a vibrar en morse
+    void (*wake_screen)(void);                               // una alerta de clase pide la pantalla encendida
 } alert_outputs_t;
 
 // Politica de alertas: decide que mostrar y cuando vibrar a partir de lo que oye el reloj.

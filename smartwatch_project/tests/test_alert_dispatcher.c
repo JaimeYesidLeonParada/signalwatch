@@ -52,17 +52,26 @@ static void fake_alert_icon(const char *label, int level)
     icon_count++;
 }
 
+static int   wake_count;
+
+static void fake_wake_screen(void)
+{
+    wake_count++;
+}
+
 static const alert_outputs_t OUTPUTS = {
     .audio_level   = fake_audio_level,
     .inference     = fake_inference,
     .alert_icon    = fake_alert_icon,
     .notification  = fake_notification,
     .vibrate_morse = fake_vibrate,
+    .wake_screen   = fake_wake_screen,
 };
 
 void setUp(void)
 {
     audio_level_count = notification_count = vibration_count = inference_count = icon_count = 0;
+    wake_count = 0;
     alert_dispatcher_init(&OUTPUTS);
 }
 
@@ -216,6 +225,36 @@ static void test_inference_message_carries_the_best_class(void)
     TEST_ASSERT_EQUAL_FLOAT(0.8f, inferences[0].confidence);
 }
 
+// Una alerta de clase (nivel medio o alto) enciende la pantalla.
+static void test_class_alert_wakes_the_screen(void)
+{
+    ei_wrapper_result_t high = single(catalog_label(0), 0.9f);
+    alert_dispatcher_on_classification(&high);
+    TEST_ASSERT_EQUAL(1, wake_count);
+
+    ei_wrapper_result_t medium = single(catalog_label(1), 0.65f);
+    alert_dispatcher_on_classification(&medium);
+    TEST_ASSERT_EQUAL(2, wake_count);
+}
+
+// Una clase con nivel bajo o nulo, o una etiqueta que no es alerta, no enciende la pantalla.
+static void test_weak_or_unknown_detections_do_not_wake_the_screen(void)
+{
+    ei_wrapper_result_t low = single(catalog_label(0), 0.55f);
+    alert_dispatcher_on_classification(&low);
+    ei_wrapper_result_t unknown = single("dog-barking", 0.9f);
+    alert_dispatcher_on_classification(&unknown);
+    TEST_ASSERT_EQUAL(0, wake_count);
+}
+
+// El ruido fuerte avisa y vibra, pero no enciende la pantalla.
+static void test_loud_sound_does_not_wake_the_screen(void)
+{
+    alert_dispatcher_on_audio_level(95);
+    TEST_ASSERT_EQUAL(1, vibration_count);
+    TEST_ASSERT_EQUAL(0, wake_count);
+}
+
 // Una salida sin conectar se ignora en vez de romper.
 static void test_missing_outputs_are_ignored(void)
 {
@@ -239,6 +278,9 @@ int main(void)
     RUN_TEST(test_unknown_class_does_not_vibrate_but_updates_its_icon);
     RUN_TEST(test_each_class_updates_its_icon_with_its_own_level);
     RUN_TEST(test_inference_message_carries_the_best_class);
+    RUN_TEST(test_class_alert_wakes_the_screen);
+    RUN_TEST(test_weak_or_unknown_detections_do_not_wake_the_screen);
+    RUN_TEST(test_loud_sound_does_not_wake_the_screen);
     RUN_TEST(test_missing_outputs_are_ignored);
     return UNITY_END();
 }

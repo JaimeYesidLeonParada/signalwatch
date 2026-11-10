@@ -49,6 +49,7 @@ void app_init(void)
         .alert_icon    = ui_post_alert_icon_msg,
         .notification  = ui_post_notification_msg,
         .vibrate_morse = vibration_morse_play,
+        .wake_screen   = ui_post_wake_msg,
     };
     alert_dispatcher_init(&alert_outputs);
     const ai_listener_t ai_listener = {

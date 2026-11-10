@@ -59,6 +59,10 @@ void alert_dispatcher_on_classification(const ei_wrapper_result_t *result)
             if (morse != NULL && outputs.vibrate_morse) {
                 outputs.vibrate_morse(morse);
             }
+            // Solo las clases del catalogo encienden la pantalla; el ruido fuerte no.
+            if (morse != NULL && outputs.wake_screen) {
+                outputs.wake_screen();
+            }
         }
     }
 }

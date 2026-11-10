@@ -36,6 +36,7 @@ typedef enum {
     UI_MSG_AUDIO_LEVEL,
     UI_MSG_ALERT_ICON,
     UI_MSG_NOTIFICATION,
+    UI_MSG_WAKE,
 } ui_msg_type_t;
 
 typedef struct {
@@ -87,6 +88,10 @@ static void ui_handle_msg(const ui_msg_t *msg)
 
         case UI_MSG_NOTIFICATION:
         ui_notification_show_text(scr, msg->data.notification.notification);
+        break;
+
+        case UI_MSG_WAKE:
+        ui_sleep_activity();
         break;
     }
 }
@@ -254,6 +259,12 @@ void ui_post_notification_msg(const char *text)
 {
     ui_msg_t msg = { .type = UI_MSG_NOTIFICATION };
     strncpy(msg.data.notification.notification, text, sizeof(msg.data.notification.notification) - 1);
+    xQueueSend(ui_queue, &msg, 0);
+}
+
+void ui_post_wake_msg(void)
+{
+    ui_msg_t msg = { .type = UI_MSG_WAKE };
     xQueueSend(ui_queue, &msg, 0);
 }
 
