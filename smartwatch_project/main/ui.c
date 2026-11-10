@@ -5,6 +5,7 @@
 #include "ui_vu.h"
 #include "ui_alerts.h"
 #include "ui_settings.h"
+#include "ui_sleep.h"
 #include "alert_urgent.h"
 #include "clock_format.h"
 #include "time_edit.h"
@@ -203,6 +204,20 @@ void ui_set_time_sink(time_sink_t sink)
     time_sink = sink;
 }
 
+void ui_set_display_power(display_power_t power)
+{
+    ui_sleep_set_power(power);
+}
+
+// La pantalla se acaba de apagar por inactividad. Si estaba en los ajustes vuelve a la
+// principal (lo editado sin guardar se descarta), para que al despertar se vea el reloj.
+static void on_screen_sleep(void)
+{
+    if (lv_screen_active() == settings_scr) {
+        lv_screen_load(main_scr);
+    }
+}
+
 void ui_start(lv_disp_t *display)
 {
     disp = display;
@@ -222,6 +237,7 @@ void ui_start(lv_disp_t *display)
     lv_obj_add_event_cb(settings_scr, on_swipe, LV_EVENT_GESTURE, NULL);
     lv_obj_add_event_cb(settings_scr, on_settings_open, LV_EVENT_SCREEN_LOAD_START, NULL);
     on_settings_open(NULL);   // deja la pantalla con texto desde el inicio
+    ui_sleep_create(disp, on_screen_sleep);
 
     lv_mem_monitor_t mem;
     lv_mem_monitor(&mem);

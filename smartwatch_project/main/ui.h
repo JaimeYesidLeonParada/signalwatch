@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "lvgl.h"
 #include "time_source.h"
+#include "display_power.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,6 +20,10 @@ void ui_set_time_source(time_source_t source);
 // Conecta a donde se guarda la hora que el usuario termina de editar (la llama app_init.c).
 // Mientras no se conecte, guardar falla y los ajustes muestran un aviso.
 void ui_set_time_sink(time_sink_t sink);
+
+// Conecta como se enciende y apaga la pantalla (la llama app_init.c). Mientras no se conecte,
+// la pantalla no se apaga sola.
+void ui_set_display_power(display_power_t power);
 
 // Misma firma que rtc_clock_cb_t. dow: 0=domingo; si valid es false se muestra la hora en 12:00 y sin fecha.
 void ui_post_clock_msg(int hour, int min, int dow, int day, int month, bool valid);

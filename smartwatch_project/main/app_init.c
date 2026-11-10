@@ -23,6 +23,7 @@ void app_init(void)
     // ui_start, y touch necesita el display ya inicializado.
     lv_disp_t *disp = display_hw_init();
     ui_start(disp);
+    ui_set_display_power(display_hw_set_backlight);   // la UI apaga la pantalla si no se usa
 
     i2c_master_bus_handle_t bus_handle = i2c_bus_init();
 

@@ -21,6 +21,11 @@
 
 static const char *TAG = "display_hw";
 
+void display_hw_set_backlight(bool on)
+{
+    gpio_set_level(LCD_BL_PIN, on ? 1 : 0);
+}
+
 lv_disp_t *display_hw_init(void)
 {
     gpio_reset_pin(LCD_BL_PIN);
