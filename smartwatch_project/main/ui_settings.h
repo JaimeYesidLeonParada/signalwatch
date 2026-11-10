@@ -8,6 +8,9 @@
 typedef enum {
     SETTINGS_INPUT_SELECT_HOUR,     // toco la zona de la hora
     SETTINGS_INPUT_SELECT_MINUTE,   // toco la zona de los minutos
+    SETTINGS_INPUT_SELECT_DAY,      // toco la zona del dia
+    SETTINGS_INPUT_SELECT_MONTH,    // toco la zona del mes
+    SETTINGS_INPUT_SELECT_YEAR,     // toco la zona del anio
     SETTINGS_INPUT_INCREMENT,       // toco "+" (o lo mantiene pulsado)
     SETTINGS_INPUT_DECREMENT,       // toco "-" (o lo mantiene pulsado)
 } settings_input_t;
@@ -16,10 +19,23 @@ typedef void (*settings_input_cb_t)(settings_input_t input);
 
 // Campo resaltado en pantalla (el que "+" y "-" van a cambiar).
 typedef enum {
-    SETTINGS_FIELD_NONE,
     SETTINGS_FIELD_HOUR,
     SETTINGS_FIELD_MINUTE,
+    SETTINGS_FIELD_DAY,
+    SETTINGS_FIELD_MONTH,
+    SETTINGS_FIELD_YEAR,
+    SETTINGS_FIELD_COUNT
 } settings_field_t;
+
+// Todo lo que la pantalla muestra. Los textos ya vienen formateados (ver clock_format_full).
+typedef struct {
+    const char *time;       // "H:MM"; se parte en el ':' para dar a hora y minutos su propia zona
+    const char *ampm;       // "AM" o "PM"
+    const char *day;        // "8"
+    const char *month;      // "Nov"
+    const char *year;       // "2026"
+    settings_field_t selected;
+} settings_view_t;
 
 // Crea la pantalla de ajustes (una pantalla aparte de la principal) y la devuelve.
 // No la muestra: ui.c decide cuando cargarla. on_input recibe cada accion del usuario;
@@ -27,10 +43,7 @@ typedef enum {
 lv_obj_t *ui_settings_create(settings_input_cb_t on_input);
 
 // Muestra la hora y la fecha que se estan editando y resalta el campo seleccionado.
-// time es "H:MM" (se parte en el ':' para dar a la hora y a los minutos su propia zona);
-// los textos ya vienen formateados (ver clock_format_full). Solo se llama desde el hilo de
-// LVGL, con el lock tomado.
-void ui_settings_show_time(const char *time, const char *ampm, const char *date,
-                           settings_field_t selected);
+// Solo se llama desde el hilo de LVGL, con el lock tomado.
+void ui_settings_show(const settings_view_t *view);
 
 #endif // UI_SETTINGS_H

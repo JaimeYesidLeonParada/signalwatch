@@ -123,16 +123,10 @@ static void test_texts_fit_their_buffers(void)
 
 // ---- clock_format_full (pantalla de ajustes) ----
 
-typedef struct {
-    char time[CLOCK_TIME_LEN];
-    char ampm[CLOCK_AMPM_LEN];
-    char date[CLOCK_FULL_DATE_LEN];
-} full_texts_t;
-
-static full_texts_t format_full(const wall_time_t *t, bool valid)
+static clock_texts_t format_full(const wall_time_t *t, bool valid)
 {
-    full_texts_t f;
-    clock_format_full(t, valid, f.time, sizeof(f.time), f.ampm, sizeof(f.ampm), f.date, sizeof(f.date));
+    clock_texts_t f;
+    clock_format_full(t, valid, &f);
     return f;
 }
 
@@ -147,16 +141,15 @@ static wall_time_t at(int hour, int minute)
 static void test_full_format_of_an_afternoon_time(void)
 {
     wall_time_t t = at(14, 30);
-    full_texts_t f = format_full(&t, true);
+    clock_texts_t f = format_full(&t, true);
     TEST_ASSERT_EQUAL_STRING("2:30", f.time);
     TEST_ASSERT_EQUAL_STRING("PM", f.ampm);
-    TEST_ASSERT_EQUAL_STRING("Dom 8 Nov 2026", f.date);
 }
 
 static void test_full_format_of_a_morning_time(void)
 {
     wall_time_t t = at(9, 5);
-    full_texts_t f = format_full(&t, true);
+    clock_texts_t f = format_full(&t, true);
     TEST_ASSERT_EQUAL_STRING("9:05", f.time);
     TEST_ASSERT_EQUAL_STRING("AM", f.ampm);
 }
@@ -171,35 +164,58 @@ static void test_full_format_midnight_and_noon(void)
     TEST_ASSERT_EQUAL_STRING("PM",    format_full(&noon, true).ampm);
 }
 
+// La fecha sale partida en dia, mes y anio, cada uno en su texto.
+static void test_full_format_splits_the_date(void)
+{
+    wall_time_t t = at(14, 30);
+    clock_texts_t f = format_full(&t, true);
+    TEST_ASSERT_EQUAL_STRING("8", f.day);
+    TEST_ASSERT_EQUAL_STRING("Nov", f.month);
+    TEST_ASSERT_EQUAL_STRING("2026", f.year);
+}
+
+static void test_full_format_day_has_no_leading_zero_and_two_digits_fit(void)
+{
+    wall_time_t t = at(12, 0);
+    t.day = 5;
+    TEST_ASSERT_EQUAL_STRING("5", format_full(&t, true).day);
+    t.day = 31;
+    TEST_ASSERT_EQUAL_STRING("31", format_full(&t, true).day);
+}
+
 static void test_full_format_without_a_valid_time_shows_the_default(void)
 {
     wall_time_t t = at(14, 30);
-    full_texts_t f = format_full(&t, false);
+    clock_texts_t f = format_full(&t, false);
     TEST_ASSERT_EQUAL_STRING("12:00", f.time);
     TEST_ASSERT_EQUAL_STRING("AM", f.ampm);
-    TEST_ASSERT_EQUAL_STRING("Jue 1 Ene 2026", f.date);
+    TEST_ASSERT_EQUAL_STRING("1", f.day);
+    TEST_ASSERT_EQUAL_STRING("Ene", f.month);
+    TEST_ASSERT_EQUAL_STRING("2026", f.year);
 }
 
 static void test_full_format_with_null_time_shows_the_default(void)
 {
-    TEST_ASSERT_EQUAL_STRING("Jue 1 Ene 2026", format_full(NULL, true).date);
+    TEST_ASSERT_EQUAL_STRING("2026", format_full(NULL, true).year);
+    TEST_ASSERT_EQUAL_STRING("Ene", format_full(NULL, true).month);
 }
 
 static void test_full_format_out_of_range_year_shows_the_default(void)
 {
     wall_time_t t = at(14, 30);
     t.year = 2100;
-    TEST_ASSERT_EQUAL_STRING("Jue 1 Ene 2026", format_full(&t, true).date);
+    TEST_ASSERT_EQUAL_STRING("2026", format_full(&t, true).year);
     t.year = 1999;
-    TEST_ASSERT_EQUAL_STRING("Jue 1 Ene 2026", format_full(&t, true).date);
+    TEST_ASSERT_EQUAL_STRING("2026", format_full(&t, true).year);
 }
-
 int main(void)
 {
     UNITY_BEGIN();
     RUN_TEST(test_full_format_of_an_afternoon_time);
     RUN_TEST(test_full_format_of_a_morning_time);
     RUN_TEST(test_full_format_midnight_and_noon);
+    RUN_TEST(test_full_format_splits_the_date);
+    RUN_TEST(test_full_format_day_has_no_leading_zero_and_two_digits_fit);
     RUN_TEST(test_full_format_without_a_valid_time_shows_the_default);
     RUN_TEST(test_full_format_with_null_time_shows_the_default);
     RUN_TEST(test_full_format_out_of_range_year_shows_the_default);

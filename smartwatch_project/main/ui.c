@@ -126,13 +126,21 @@ static void render_settings(void)
         .dow = (uint8_t)time_edit_weekday(edit.year, edit.month, edit.day),
         .hour = edit.hour, .minute = edit.minute, .second = 0,
     };
-    char time[CLOCK_TIME_LEN], ampm[CLOCK_AMPM_LEN], date[CLOCK_FULL_DATE_LEN];
-    clock_format_full(&t, true, time, sizeof(time), ampm, sizeof(ampm), date, sizeof(date));
+    clock_texts_t texts;
+    clock_format_full(&t, true, &texts);
 
-    settings_field_t selected = SETTINGS_FIELD_NONE;
-    if (edit.field == TIME_FIELD_HOUR)   selected = SETTINGS_FIELD_HOUR;
-    if (edit.field == TIME_FIELD_MINUTE) selected = SETTINGS_FIELD_MINUTE;
-    ui_settings_show_time(time, ampm, date, selected);
+    settings_view_t view = {
+        .time = texts.time, .ampm = texts.ampm,
+        .day = texts.day, .month = texts.month, .year = texts.year,
+    };
+    switch (edit.field) {
+        case TIME_FIELD_HOUR:   view.selected = SETTINGS_FIELD_HOUR;   break;
+        case TIME_FIELD_MINUTE: view.selected = SETTINGS_FIELD_MINUTE; break;
+        case TIME_FIELD_DAY:    view.selected = SETTINGS_FIELD_DAY;    break;
+        case TIME_FIELD_MONTH:  view.selected = SETTINGS_FIELD_MONTH;  break;
+        default:                view.selected = SETTINGS_FIELD_YEAR;   break;
+    }
+    ui_settings_show(&view);
 }
 
 // Traduce lo que hace el usuario en la pantalla a operaciones de time_edit.
@@ -141,6 +149,9 @@ static void on_settings_input(settings_input_t input)
     switch (input) {
         case SETTINGS_INPUT_SELECT_HOUR:   edit.field = TIME_FIELD_HOUR;   break;
         case SETTINGS_INPUT_SELECT_MINUTE: edit.field = TIME_FIELD_MINUTE; break;
+        case SETTINGS_INPUT_SELECT_DAY:    edit.field = TIME_FIELD_DAY;    break;
+        case SETTINGS_INPUT_SELECT_MONTH:  edit.field = TIME_FIELD_MONTH;  break;
+        case SETTINGS_INPUT_SELECT_YEAR:   edit.field = TIME_FIELD_YEAR;   break;
         case SETTINGS_INPUT_INCREMENT:     time_edit_increment(&edit);     break;
         case SETTINGS_INPUT_DECREMENT:     time_edit_decrement(&edit);     break;
     }

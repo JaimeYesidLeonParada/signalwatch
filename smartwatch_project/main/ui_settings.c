@@ -1,19 +1,34 @@
 #include "ui_settings.h"
 #include <string.h>
 
-// Fuente de la hora: Nine Pin de 56 px, solo digitos y ':' (nine_pin_70 es la del reloj principal).
-extern const lv_font_t nine_pin_56;
+// Fuente de la hora: Nine Pin de 48 px, solo digitos y ':' (nine_pin_70 es la del reloj principal).
+extern const lv_font_t nine_pin_48;
+// Fuente de la fecha: Montserrat de 28 px (ASCII), generada para el proyecto con lv_font_conv.
+extern const lv_font_t date_font_28;
 
 #define COLOR_TEXT      0xFFFFFF
 #define COLOR_SELECTED  0xFFB000   // borde de la zona seleccionada
 #define COLOR_BUTTON    0x303030
 #define COLOR_PRESSED   0x606060
 
+// Distribucion (pantalla de 240x280). La hora y el AM/PM forman una fila; debajo va la fecha
+// y abajo los botones.
+#define TIME_Y        54
+#define TIME_ZONE_W   64
+#define TIME_ZONE_H   64
+#define DATE_Y        130
+#define DATE_ZONE_H   52
+#define BUTTONS_Y     210
+#define BUTTON_W      80
+#define BUTTON_H      48
+#define BUTTON_EXT_CLICK 14   // px extra alrededor del boton que tambien responden al toque
+
 static settings_input_cb_t input_cb;
 
-static lv_obj_t *hour_box, *minute_box;
-static lv_obj_t *hour_label, *minute_label;
-static lv_obj_t *ampm_label, *date_label;
+// Una zona tocable y su texto por cada campo editable, con el mismo indice que settings_field_t.
+static lv_obj_t *zones[SETTINGS_FIELD_COUNT];
+static lv_obj_t *labels[SETTINGS_FIELD_COUNT];
+static lv_obj_t *ampm_label;
 
 static void emit(settings_input_t input)
 {
@@ -55,25 +70,30 @@ static lv_obj_t *new_zone(lv_obj_t *parent, int x, int y, int w, int h)
     return zone;
 }
 
-// Zona de hora o minutos: con la fuente grande dentro.
-static lv_obj_t *new_field(lv_obj_t *scr, int x, settings_input_t input, lv_obj_t **label)
+// Zona tocable de un campo editable, con su texto centrado (font NULL = fuente por defecto).
+static void new_field(lv_obj_t *scr, settings_field_t field, settings_input_t input,
+                      int x, int y, int w, int h, const lv_font_t *font)
 {
-    lv_obj_t *zone = new_zone(scr, x, 38, 80, 74);
+    lv_obj_t *zone = new_zone(scr, x, y, w, h);
     lv_obj_add_event_cb(zone, on_field_clicked, LV_EVENT_CLICKED, (void *)(intptr_t)input);
-    *label = new_label(zone, &nine_pin_56);
-    lv_obj_remove_flag(*label, LV_OBJ_FLAG_CLICKABLE);   // el toque lo recibe la zona
-    lv_obj_center(*label);
-    return zone;
+    lv_obj_t *label = new_label(zone, font);
+    lv_obj_remove_flag(label, LV_OBJ_FLAG_CLICKABLE);   // el toque lo recibe la zona
+    lv_obj_center(label);
+    zones[field] = zone;
+    labels[field] = label;
 }
 
-// Boton grande con "+" o "-" dibujado con barras, para no depender de la fuente.
+// Boton con "+" o "-" dibujado con barras, para no depender de la fuente.
 static void new_step_button(lv_obj_t *scr, int x, bool plus, settings_input_t input)
 {
-    lv_obj_t *btn = new_zone(scr, x, 190, 90, 60);
+    lv_obj_t *btn = new_zone(scr, x, BUTTONS_Y, BUTTON_W, BUTTON_H);
     lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_bg_color(btn, lv_color_hex(COLOR_BUTTON), LV_PART_MAIN);
     lv_obj_set_style_bg_color(btn, lv_color_hex(COLOR_PRESSED), LV_PART_MAIN | LV_STATE_PRESSED);
     lv_obj_set_style_radius(btn, 16, LV_PART_MAIN);
+    // El dedo no acierta con precision en un boton tan chico: el area que responde al toque es
+    // mayor que lo que se dibuja. Con 32 px entre los dos botones, 14 px extra por lado no se pisan.
+    lv_obj_set_ext_click_area(btn, BUTTON_EXT_CLICK);
     lv_obj_add_event_cb(btn, on_step_event, LV_EVENT_SHORT_CLICKED, (void *)(intptr_t)input);
     lv_obj_add_event_cb(btn, on_step_event, LV_EVENT_LONG_PRESSED_REPEAT, (void *)(intptr_t)input);
 
@@ -81,9 +101,9 @@ static void new_step_button(lv_obj_t *scr, int x, bool plus, settings_input_t in
         lv_obj_t *bar = lv_obj_create(btn);
         lv_obj_remove_flag(bar, LV_OBJ_FLAG_CLICKABLE);   // el toque lo recibe el boton
         lv_obj_remove_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_set_size(bar, i == 0 ? 36 : 7, i == 0 ? 7 : 36);
+        lv_obj_set_size(bar, i == 0 ? 32 : 6, i == 0 ? 6 : 32);
         lv_obj_set_style_border_width(bar, 0, LV_PART_MAIN);
-        lv_obj_set_style_radius(bar, 4, LV_PART_MAIN);
+        lv_obj_set_style_radius(bar, 3, LV_PART_MAIN);
         lv_obj_set_style_bg_color(bar, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
         lv_obj_center(bar);
     }
@@ -103,21 +123,29 @@ lv_obj_t *ui_settings_create(settings_input_cb_t on_input)
     lv_label_set_text(title, "AJUSTES");
     lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 10);
 
-    // Hora y minutos son dos zonas tocables; los ':' van entre ellas.
-    hour_box   = new_field(scr, 18,  SETTINGS_INPUT_SELECT_HOUR,   &hour_label);
-    minute_box = new_field(scr, 142, SETTINGS_INPUT_SELECT_MINUTE, &minute_label);
-    lv_obj_t *colon = new_label(scr, &nine_pin_56);
+    // Fila de la hora: HH : MM AM/PM. Cada numero es una zona tocable; el ':' va entre ellas
+    // y el AM/PM a la derecha, a la altura de la base de los digitos.
+    const int hour_x = 22, colon_x = hour_x + TIME_ZONE_W;
+    const int minute_x = colon_x + 31;   // 31 px = ancho de un digito de la fuente de 48 px
+    new_field(scr, SETTINGS_FIELD_HOUR,   SETTINGS_INPUT_SELECT_HOUR,   hour_x,   TIME_Y,
+              TIME_ZONE_W, TIME_ZONE_H, &nine_pin_48);
+    new_field(scr, SETTINGS_FIELD_MINUTE, SETTINGS_INPUT_SELECT_MINUTE, minute_x, TIME_Y,
+              TIME_ZONE_W, TIME_ZONE_H, &nine_pin_48);
+    lv_obj_t *colon = new_label(scr, &nine_pin_48);
     lv_label_set_text(colon, ":");
     lv_obj_remove_flag(colon, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_align(colon, LV_ALIGN_TOP_MID, 0, 38 + 13);
+    lv_obj_set_pos(colon, colon_x, TIME_Y + (TIME_ZONE_H - 41) / 2);   // 41 px = alto de los digitos
 
     ampm_label = new_label(scr, NULL);
-    date_label = new_label(scr, NULL);
-    lv_obj_align(ampm_label, LV_ALIGN_TOP_MID, 0, 116);
-    lv_obj_align(date_label, LV_ALIGN_TOP_MID, 0, 140);
+    lv_obj_align_to(ampm_label, zones[SETTINGS_FIELD_MINUTE], LV_ALIGN_OUT_RIGHT_BOTTOM, 2, -11);
 
-    new_step_button(scr, 20,  false, SETTINGS_INPUT_DECREMENT);
-    new_step_button(scr, 130, true,  SETTINGS_INPUT_INCREMENT);
+    // Fecha: dia, mes y anio, tres zonas tocables en fila, mas grandes que su texto.
+    new_field(scr, SETTINGS_FIELD_DAY,   SETTINGS_INPUT_SELECT_DAY,   8,   DATE_Y, 62, DATE_ZONE_H, &date_font_28);
+    new_field(scr, SETTINGS_FIELD_MONTH, SETTINGS_INPUT_SELECT_MONTH, 76,  DATE_Y, 70, DATE_ZONE_H, &date_font_28);
+    new_field(scr, SETTINGS_FIELD_YEAR,  SETTINGS_INPUT_SELECT_YEAR,  152, DATE_Y, 82, DATE_ZONE_H, &date_font_28);
+
+    new_step_button(scr, 24,  false, SETTINGS_INPUT_DECREMENT);
+    new_step_button(scr, 136, true,  SETTINGS_INPUT_INCREMENT);
 
     return scr;
 }
@@ -128,27 +156,34 @@ static void set_selected(lv_obj_t *zone, bool selected)
     lv_obj_set_style_border_color(zone, lv_color_hex(COLOR_SELECTED), LV_PART_MAIN);
 }
 
-void ui_settings_show_time(const char *time, const char *ampm, const char *date,
-                           settings_field_t selected)
+static void set_field_text(settings_field_t field, const char *text)
+{
+    lv_label_set_text(labels[field], text);
+    lv_obj_center(labels[field]);   // el ancho cambia con el texto
+}
+
+void ui_settings_show(const settings_view_t *view)
 {
     // "H:MM" -> hora y minutos, cada uno en su zona.
     char hour[4] = "", minute[4] = "";
-    const char *colon = strchr(time, ':');
+    const char *colon = strchr(view->time, ':');
     if (colon != NULL) {
-        size_t hour_len = (size_t)(colon - time);
+        size_t hour_len = (size_t)(colon - view->time);
         if (hour_len >= sizeof(hour)) hour_len = sizeof(hour) - 1;
-        memcpy(hour, time, hour_len);
+        memcpy(hour, view->time, hour_len);
         hour[hour_len] = '\0';
         strncpy(minute, colon + 1, sizeof(minute) - 1);
     }
 
-    lv_label_set_text(hour_label, hour);
-    lv_label_set_text(minute_label, minute);
-    lv_obj_center(hour_label);     // el ancho cambia con 1 o 2 digitos
-    lv_obj_center(minute_label);
-    lv_label_set_text(ampm_label, ampm);
-    lv_label_set_text(date_label, date);
+    set_field_text(SETTINGS_FIELD_HOUR, hour);
+    set_field_text(SETTINGS_FIELD_MINUTE, minute);
+    set_field_text(SETTINGS_FIELD_DAY, view->day);
+    set_field_text(SETTINGS_FIELD_MONTH, view->month);
+    set_field_text(SETTINGS_FIELD_YEAR, view->year);
+    lv_label_set_text(ampm_label, view->ampm);
+    lv_obj_align_to(ampm_label, zones[SETTINGS_FIELD_MINUTE], LV_ALIGN_OUT_RIGHT_BOTTOM, 2, -11);
 
-    set_selected(hour_box,   selected == SETTINGS_FIELD_HOUR);
-    set_selected(minute_box, selected == SETTINGS_FIELD_MINUTE);
+    for (int f = 0; f < SETTINGS_FIELD_COUNT; f++) {
+        set_selected(zones[f], f == (int)view->selected);
+    }
 }
