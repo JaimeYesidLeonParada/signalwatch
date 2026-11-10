@@ -199,6 +199,33 @@ static void test_year_wraps_inside_the_rtc_range(void)
     TEST_ASSERT_EQUAL_UINT16(2099, t.year);
 }
 
+// ---- time_edit_to_wall_time ----
+
+static void test_to_wall_time_copies_the_fields_and_zeroes_the_seconds(void)
+{
+    time_edit_t t = make(TIME_FIELD_HOUR);   // 2026-11-08 14:30
+    wall_time_t w;
+    time_edit_to_wall_time(&t, &w);
+    TEST_ASSERT_EQUAL_UINT16(2026, w.year);
+    TEST_ASSERT_EQUAL_UINT8(11, w.month);
+    TEST_ASSERT_EQUAL_UINT8(8, w.day);
+    TEST_ASSERT_EQUAL_UINT8(14, w.hour);
+    TEST_ASSERT_EQUAL_UINT8(30, w.minute);
+    TEST_ASSERT_EQUAL_UINT8(0, w.second);
+}
+
+// El RTC pide el dia de la semana: 8 de noviembre de 2026 es domingo.
+static void test_to_wall_time_computes_the_weekday(void)
+{
+    time_edit_t t = make(TIME_FIELD_HOUR);
+    wall_time_t w;
+    time_edit_to_wall_time(&t, &w);
+    TEST_ASSERT_EQUAL_UINT8(0, w.dow);
+    time_edit_init(&t, 2000, 1, 1, 0, 0);   // sabado
+    time_edit_to_wall_time(&t, &w);
+    TEST_ASSERT_EQUAL_UINT8(6, w.dow);
+}
+
 // ---- seleccion de campo ----
 
 static void test_next_field_walks_all_fields_and_wraps(void)
@@ -244,6 +271,8 @@ int main(void)
     RUN_TEST(test_changing_month_fits_the_day);
     RUN_TEST(test_changing_year_fits_feb_29);
     RUN_TEST(test_year_wraps_inside_the_rtc_range);
+    RUN_TEST(test_to_wall_time_copies_the_fields_and_zeroes_the_seconds);
+    RUN_TEST(test_to_wall_time_computes_the_weekday);
     RUN_TEST(test_next_field_walks_all_fields_and_wraps);
     RUN_TEST(test_prev_field_wraps_to_the_last_field);
     return UNITY_END();

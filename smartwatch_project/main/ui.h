@@ -16,6 +16,10 @@ void ui_start(lv_disp_t *display);
 // Mientras no se conecte, los ajustes muestran la hora por defecto.
 void ui_set_time_source(time_source_t source);
 
+// Conecta a donde se guarda la hora que el usuario termina de editar (la llama app_init.c).
+// Mientras no se conecte, guardar falla y los ajustes muestran un aviso.
+void ui_set_time_sink(time_sink_t sink);
+
 // Misma firma que rtc_clock_cb_t. dow: 0=domingo; si valid es false se muestra la hora en 12:00 y sin fecha.
 void ui_post_clock_msg(int hour, int min, int dow, int day, int month, bool valid);
 void ui_post_battery_msg(int bat_pct, bool is_charging);

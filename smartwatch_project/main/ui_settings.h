@@ -13,6 +13,7 @@ typedef enum {
     SETTINGS_INPUT_SELECT_YEAR,     // toco la zona del anio
     SETTINGS_INPUT_INCREMENT,       // toco "+" (o lo mantiene pulsado)
     SETTINGS_INPUT_DECREMENT,       // toco "-" (o lo mantiene pulsado)
+    SETTINGS_INPUT_SAVE,            // toco el check de guardar
 } settings_input_t;
 
 typedef void (*settings_input_cb_t)(settings_input_t input);
@@ -45,5 +46,9 @@ lv_obj_t *ui_settings_create(settings_input_cb_t on_input);
 // Muestra la hora y la fecha que se estan editando y resalta el campo seleccionado.
 // Solo se llama desde el hilo de LVGL, con el lock tomado.
 void ui_settings_show(const settings_view_t *view);
+
+// Muestra un aviso breve (por ejemplo "No se pudo guardar") que se borra solo a los pocos
+// segundos, o antes si se vuelve a dibujar la pantalla. Solo desde el hilo de LVGL, con el lock.
+void ui_settings_show_message(const char *text);
 
 #endif // UI_SETTINGS_H

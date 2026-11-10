@@ -2,6 +2,7 @@
 #define TIME_EDIT_H
 
 #include <stdint.h>
+#include "time_sink.h"   // wall_time_t
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,6 +54,10 @@ void time_edit_decrement(time_edit_t *t);
 // Selecciona el campo siguiente o anterior, dando la vuelta.
 void time_edit_next_field(time_edit_t *t);
 void time_edit_prev_field(time_edit_t *t);
+
+// Pasa lo que se esta editando al formato neutro de time_sink: calcula el dia de la semana y
+// deja los segundos en 0.
+void time_edit_to_wall_time(const time_edit_t *t, wall_time_t *out);
 
 // Dias del mes (28..31) teniendo en cuenta los bisiestos. month fuera de 1..12 devuelve 0.
 int time_edit_days_in_month(int year, int month);

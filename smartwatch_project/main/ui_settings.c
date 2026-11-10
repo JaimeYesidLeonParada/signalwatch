@@ -10,6 +10,9 @@ extern const lv_font_t date_font_28;
 #define COLOR_SELECTED  0xFFB000   // borde de la zona seleccionada
 #define COLOR_BUTTON    0x303030
 #define COLOR_PRESSED   0x606060
+#define COLOR_SAVE      0xD01818
+#define COLOR_SAVE_PRESSED 0xFF4545
+#define COLOR_ERROR     0xFF4040
 
 // Distribucion (pantalla de 240x280). La hora y el AM/PM forman una fila; debajo va la fecha
 // y abajo los botones.
@@ -18,10 +21,13 @@ extern const lv_font_t date_font_28;
 #define TIME_ZONE_H   64
 #define DATE_Y        130
 #define DATE_ZONE_H   52
-#define BUTTONS_Y     210
-#define BUTTON_W      80
-#define BUTTON_H      48
-#define BUTTON_EXT_CLICK 14   // px extra alrededor del boton que tambien responden al toque
+#define BUTTONS_Y     206
+#define BUTTON_W      66   // - y +
+#define SAVE_W        74   // check de guardar, entre los dos
+#define BUTTON_H      56
+// Franja de abajo donde se toca: desde justo debajo de la fecha hasta el borde de la pantalla.
+#define TOUCH_Y       190
+#define TOUCH_H       (280 - TOUCH_Y)
 
 static settings_input_cb_t input_cb;
 
@@ -29,6 +35,8 @@ static settings_input_cb_t input_cb;
 static lv_obj_t *zones[SETTINGS_FIELD_COUNT];
 static lv_obj_t *labels[SETTINGS_FIELD_COUNT];
 static lv_obj_t *ampm_label;
+static lv_obj_t *message_label;
+static lv_timer_t *message_timer;
 
 static void emit(settings_input_t input)
 {
@@ -83,23 +91,49 @@ static void new_field(lv_obj_t *scr, settings_field_t field, settings_input_t in
     labels[field] = label;
 }
 
-// Boton con "+" o "-" dibujado con barras, para no depender de la fuente.
-static void new_step_button(lv_obj_t *scr, int x, bool plus, settings_input_t input)
+// Mientras el dedo esta sobre la zona de un boton, el boton dibujado se ve presionado.
+static void on_touch_press_state(lv_event_t *e)
 {
-    lv_obj_t *btn = new_zone(scr, x, BUTTONS_Y, BUTTON_W, BUTTON_H);
-    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(btn, lv_color_hex(COLOR_BUTTON), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(btn, lv_color_hex(COLOR_PRESSED), LV_PART_MAIN | LV_STATE_PRESSED);
-    lv_obj_set_style_radius(btn, 16, LV_PART_MAIN);
-    // El dedo no acierta con precision en un boton tan chico: el area que responde al toque es
-    // mayor que lo que se dibuja. Con 32 px entre los dos botones, 14 px extra por lado no se pisan.
-    lv_obj_set_ext_click_area(btn, BUTTON_EXT_CLICK);
-    lv_obj_add_event_cb(btn, on_step_event, LV_EVENT_SHORT_CLICKED, (void *)(intptr_t)input);
-    lv_obj_add_event_cb(btn, on_step_event, LV_EVENT_LONG_PRESSED_REPEAT, (void *)(intptr_t)input);
+    lv_obj_t *zone = lv_event_get_target_obj(e);
+    lv_obj_t *btn = lv_obj_get_child(zone, 0);
+    if (lv_event_get_code(e) == LV_EVENT_PRESSED) lv_obj_add_state(btn, LV_STATE_PRESSED);
+    else                                          lv_obj_remove_state(btn, LV_STATE_PRESSED);
+}
 
+// Boton de la fila de abajo. El toque lo recibe una zona transparente mucho mas grande que el
+// boton dibujado (zone_x/zone_w): las tres zonas de la fila se tocan entre si, asi que cualquier
+// toque en la franja de abajo cae en el boton mas cercano. Devuelve el boton dibujado, vacio,
+// para que el llamador le ponga el simbolo.
+static lv_obj_t *new_touch_button(lv_obj_t *scr, int zone_x, int zone_w, int btn_x, int btn_w,
+                                  uint32_t color, uint32_t color_pressed,
+                                  settings_input_t input, bool repeat)
+{
+    lv_obj_t *zone = new_zone(scr, zone_x, TOUCH_Y, zone_w, TOUCH_H);
+    lv_obj_set_style_radius(zone, 0, LV_PART_MAIN);
+    lv_obj_add_event_cb(zone, on_step_event, LV_EVENT_SHORT_CLICKED, (void *)(intptr_t)input);
+    if (repeat) lv_obj_add_event_cb(zone, on_step_event, LV_EVENT_LONG_PRESSED_REPEAT, (void *)(intptr_t)input);
+    lv_obj_add_event_cb(zone, on_touch_press_state, LV_EVENT_PRESSED, NULL);
+    lv_obj_add_event_cb(zone, on_touch_press_state, LV_EVENT_RELEASED, NULL);
+    lv_obj_add_event_cb(zone, on_touch_press_state, LV_EVENT_PRESS_LOST, NULL);
+
+    lv_obj_t *btn = new_zone(zone, btn_x - zone_x, BUTTONS_Y - TOUCH_Y, btn_w, BUTTON_H);
+    lv_obj_remove_flag(btn, LV_OBJ_FLAG_CLICKABLE);   // el toque lo recibe la zona
+    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(color), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(color_pressed), LV_PART_MAIN | LV_STATE_PRESSED);
+    lv_obj_set_style_radius(btn, 16, LV_PART_MAIN);
+    return btn;
+}
+
+// "+" o "-" dibujado con barras, para no depender de la fuente.
+static void new_step_button(lv_obj_t *scr, int zone_x, int zone_w, int btn_x, bool plus,
+                            settings_input_t input)
+{
+    lv_obj_t *btn = new_touch_button(scr, zone_x, zone_w, btn_x, BUTTON_W, COLOR_BUTTON,
+                                     COLOR_PRESSED, input, true);
     for (int i = 0; i < (plus ? 2 : 1); i++) {
         lv_obj_t *bar = lv_obj_create(btn);
-        lv_obj_remove_flag(bar, LV_OBJ_FLAG_CLICKABLE);   // el toque lo recibe el boton
+        lv_obj_remove_flag(bar, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_remove_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_set_size(bar, i == 0 ? 32 : 6, i == 0 ? 6 : 32);
         lv_obj_set_style_border_width(bar, 0, LV_PART_MAIN);
@@ -109,6 +143,22 @@ static void new_step_button(lv_obj_t *scr, int x, bool plus, settings_input_t in
     }
 }
 
+// Boton rojo con un check dibujado con una linea, para no depender de la fuente.
+static void new_save_button(lv_obj_t *scr, int zone_x, int zone_w, int btn_x)
+{
+    // Sin repeticion al mantener pulsado: guardar es una accion, no un valor que se sube.
+    lv_obj_t *btn = new_touch_button(scr, zone_x, zone_w, btn_x, SAVE_W, COLOR_SAVE,
+                                     COLOR_SAVE_PRESSED, SETTINGS_INPUT_SAVE, false);
+
+    static const lv_point_precise_t check_points[] = { {0, 13}, {11, 24}, {32, 0} };
+    lv_obj_t *check = lv_line_create(btn);
+    lv_obj_remove_flag(check, LV_OBJ_FLAG_CLICKABLE);
+    lv_line_set_points(check, check_points, 3);
+    lv_obj_set_style_line_width(check, 8, LV_PART_MAIN);
+    lv_obj_set_style_line_rounded(check, true, LV_PART_MAIN);
+    lv_obj_set_style_line_color(check, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
+    lv_obj_center(check);
+}
 lv_obj_t *ui_settings_create(settings_input_cb_t on_input)
 {
     input_cb = on_input;
@@ -144,8 +194,20 @@ lv_obj_t *ui_settings_create(settings_input_cb_t on_input)
     new_field(scr, SETTINGS_FIELD_MONTH, SETTINGS_INPUT_SELECT_MONTH, 76,  DATE_Y, 70, DATE_ZONE_H, &date_font_28);
     new_field(scr, SETTINGS_FIELD_YEAR,  SETTINGS_INPUT_SELECT_YEAR,  152, DATE_Y, 82, DATE_ZONE_H, &date_font_28);
 
-    new_step_button(scr, 24,  false, SETTINGS_INPUT_DECREMENT);
-    new_step_button(scr, 136, true,  SETTINGS_INPUT_INCREMENT);
+    // Fila de botones, de izquierda a derecha: -, guardar, +. Se dibujan con 9 px de margen y 8 px
+    // entre ellos; las zonas que reciben el toque se reparten toda la franja, partidas por la
+    // mitad del hueco entre botones.
+    const int minus_x = 9, save_x = minus_x + BUTTON_W + 8, plus_x = save_x + SAVE_W + 8;
+    const int cut1 = (minus_x + BUTTON_W + save_x) / 2, cut2 = (save_x + SAVE_W + plus_x) / 2;
+    new_step_button(scr, 0,    cut1,       minus_x, false, SETTINGS_INPUT_DECREMENT);
+    new_save_button(scr, cut1, cut2 - cut1, save_x);
+    new_step_button(scr, cut2, 240 - cut2, plus_x,  true,  SETTINGS_INPUT_INCREMENT);
+
+    // Aviso de error, entre la fecha y los botones; oculto hasta que haga falta.
+    message_label = new_label(scr, NULL);
+    lv_obj_set_style_text_color(message_label, lv_color_hex(COLOR_ERROR), LV_PART_MAIN);
+    lv_obj_align(message_label, LV_ALIGN_TOP_MID, 0, DATE_Y + DATE_ZONE_H + 2);
+    lv_obj_add_flag(message_label, LV_OBJ_FLAG_HIDDEN);
 
     return scr;
 }
@@ -162,8 +224,35 @@ static void set_field_text(settings_field_t field, const char *text)
     lv_obj_center(labels[field]);   // el ancho cambia con el texto
 }
 
+static void hide_message(void)
+{
+    if (message_timer != NULL) {
+        lv_timer_delete(message_timer);
+        message_timer = NULL;
+    }
+    lv_obj_add_flag(message_label, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void on_message_timeout(lv_timer_t *timer)
+{
+    (void)timer;
+    message_timer = NULL;   // el temporizador de una sola vez se borra solo tras este aviso
+    lv_obj_add_flag(message_label, LV_OBJ_FLAG_HIDDEN);
+}
+
+void ui_settings_show_message(const char *text)
+{
+    hide_message();
+    lv_label_set_text(message_label, text);
+    lv_obj_align(message_label, LV_ALIGN_TOP_MID, 0, DATE_Y + DATE_ZONE_H + 2);
+    lv_obj_remove_flag(message_label, LV_OBJ_FLAG_HIDDEN);
+    message_timer = lv_timer_create(on_message_timeout, 2500, NULL);
+    lv_timer_set_repeat_count(message_timer, 1);
+}
+
 void ui_settings_show(const settings_view_t *view)
 {
+    hide_message();
     // "H:MM" -> hora y minutos, cada uno en su zona.
     char hour[4] = "", minute[4] = "";
     const char *colon = strchr(view->time, ':');

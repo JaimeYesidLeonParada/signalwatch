@@ -14,6 +14,9 @@
 #include <string.h>
 #include <stdbool.h>
 #include "esp_lvgl_port.h"
+#include "esp_log.h"
+
+static const char *TAG = "ui";
 
 static lv_disp_t * disp;
 // Dos pantallas: la principal (reloj y alertas) y la de ajustes. Los mensajes siempre se
@@ -22,6 +25,8 @@ static lv_obj_t * main_scr;
 static lv_obj_t * settings_scr;
 // De donde sale la hora que muestran los ajustes; la conecta app_init.c.
 static time_source_t time_source;
+// A donde se guarda la hora editada; tambien la conecta app_init.c.
+static time_sink_t time_sink;
 
 typedef enum {
     UI_MSG_CLOCK,
@@ -121,11 +126,8 @@ static time_edit_t edit;
 // Dibuja en los ajustes el estado actual de la edicion.
 static void render_settings(void)
 {
-    wall_time_t t = {
-        .year = edit.year, .month = edit.month, .day = edit.day,
-        .dow = (uint8_t)time_edit_weekday(edit.year, edit.month, edit.day),
-        .hour = edit.hour, .minute = edit.minute, .second = 0,
-    };
+    wall_time_t t;
+    time_edit_to_wall_time(&edit, &t);
     clock_texts_t texts;
     clock_format_full(&t, true, &texts);
 
@@ -143,6 +145,22 @@ static void render_settings(void)
     ui_settings_show(&view);
 }
 
+// Guarda la hora editada. Si se guardo, el reloj principal se actualiza ya (sin esperar al
+// ciclo de cada minuto) y la pantalla vuelve a la principal; si no, se queda en los ajustes
+// con un aviso para que el usuario pueda reintentar.
+static void save_edited_time(void)
+{
+    wall_time_t t;
+    time_edit_to_wall_time(&edit, &t);
+
+    if (time_sink == NULL || !time_sink(&t)) {
+        ui_settings_show_message("No se pudo guardar");
+        return;
+    }
+    ui_clock_update(main_scr, t.hour, t.minute, t.dow, t.day, t.month, true);
+    lv_screen_load_anim(main_scr, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 250, 0, false);
+}
+
 // Traduce lo que hace el usuario en la pantalla a operaciones de time_edit.
 static void on_settings_input(settings_input_t input)
 {
@@ -154,6 +172,7 @@ static void on_settings_input(settings_input_t input)
         case SETTINGS_INPUT_SELECT_YEAR:   edit.field = TIME_FIELD_YEAR;   break;
         case SETTINGS_INPUT_INCREMENT:     time_edit_increment(&edit);     break;
         case SETTINGS_INPUT_DECREMENT:     time_edit_decrement(&edit);     break;
+        case SETTINGS_INPUT_SAVE:          save_edited_time();             return;
     }
     render_settings();
 }
@@ -179,9 +198,18 @@ void ui_set_time_source(time_source_t source)
     time_source = source;
 }
 
+void ui_set_time_sink(time_sink_t sink)
+{
+    time_sink = sink;
+}
+
 void ui_start(lv_disp_t *display)
 {
     disp = display;
+
+    // La tarea de LVGL ya esta dibujando: crear widgets sin su lock corrompe su memoria y el
+    // hilo se queda colgado (watchdog). Todo lo que toca LVGL va entre lock y unlock.
+    lvgl_port_lock(-1);
     main_scr = lv_disp_get_scr_act(disp);
     lv_obj_t * scr = main_scr;
     lv_obj_set_style_bg_color(scr, lv_color_hex(0x000000), LV_PART_MAIN);
@@ -194,6 +222,13 @@ void ui_start(lv_disp_t *display)
     lv_obj_add_event_cb(settings_scr, on_swipe, LV_EVENT_GESTURE, NULL);
     lv_obj_add_event_cb(settings_scr, on_settings_open, LV_EVENT_SCREEN_LOAD_START, NULL);
     on_settings_open(NULL);   // deja la pantalla con texto desde el inicio
+
+    lv_mem_monitor_t mem;
+    lv_mem_monitor(&mem);
+    ESP_LOGI(TAG, "memoria de LVGL: %u%% usada (%u de %u bytes), pico %u bytes, fragmentacion %u%%",
+             (unsigned)mem.used_pct, (unsigned)(mem.total_size - mem.free_size), (unsigned)mem.total_size, (unsigned)mem.max_used,
+             (unsigned)mem.frag_pct);
+    lvgl_port_unlock();
 
     ui_queue = xQueueCreate(5, sizeof(ui_msg_t));
     xTaskCreate(ui_task, "ui_task", 4096, NULL, 4, NULL);

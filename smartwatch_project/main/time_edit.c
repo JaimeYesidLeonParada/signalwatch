@@ -37,6 +37,17 @@ static void fit_day(time_edit_t *t)
     if (t->day > max) t->day = (uint8_t)max;
 }
 
+void time_edit_to_wall_time(const time_edit_t *t, wall_time_t *out)
+{
+    out->year = t->year;
+    out->month = t->month;
+    out->day = t->day;
+    out->dow = (uint8_t)time_edit_weekday(t->year, t->month, t->day);
+    out->hour = t->hour;
+    out->minute = t->minute;
+    out->second = 0;
+}
+
 void time_edit_init(time_edit_t *t, int year, int month, int day, int hour, int minute)
 {
     t->year = (uint16_t)clamp(year, TIME_EDIT_YEAR_MIN, TIME_EDIT_YEAR_MAX);

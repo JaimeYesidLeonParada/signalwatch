@@ -30,7 +30,8 @@ void app_init(void)
     bsp_es8311_init(bus_handle);
     bsp_es8311_set_in_volume(40.0);
     rtc_init(bus_handle);
-    ui_set_time_source(rtc_read_wall_time);   // los ajustes leen la hora del RTC
+    ui_set_time_source(rtc_read_wall_time);   // los ajustes leen la hora del RTC...
+    ui_set_time_sink(rtc_set_time);          // ...y guardan en el RTC la que el usuario edita
     touch_init(bus_handle, disp);
 
     button_init();
