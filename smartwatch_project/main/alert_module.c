@@ -3,7 +3,13 @@
 #include <stdbool.h>
 
 #define ALERT_MAX_LABELS     8
-#define ALERT_WINDOW_SIZE    3
+// Ultimas muestras que se recuerdan por clase, y cuantas de ellas (las mejores) se promedian.
+// Un sonido intermitente (una alarma de pitidos, por ejemplo) solo se reconoce en parte de las
+// ventanas: el resto cae en las pausas. Promediar todas diluia las detecciones buenas con las
+// pausas y nunca llegaba a alertar; promediar solo las mejores exige repeticion (una sola
+// deteccion aislada da la mitad de su valor) sin castigar las pausas.
+#define ALERT_WINDOW_SIZE    4
+#define ALERT_TOP_SAMPLES    2
 
 #define ALERT_THRESHOLD_LOW     0.5f
 #define ALERT_THRESHOLD_MEDIUM  0.6f
@@ -62,15 +68,27 @@ alert_level_t alert_module_add_sample(const char *label, float confidence, uint3
 
     // Solo cuentan las muestras recientes: tras un rato sin sonido, lo que se oyo antes ya no
     // describe lo que pasa ahora. La resta sin signo es correcta aunque now_ms haya dado la
-    // vuelta. La muestra nueva (edad 0) siempre cuenta, asi que n >= 1.
-    float sum = 0.0f;
+    // vuelta.
+    float recent[ALERT_WINDOW_SIZE];
     int n = 0;
     for (int i = 0; i < w->count; i++) {
         if ((uint32_t)(now_ms - w->time_ms[i]) <= ALERT_SAMPLE_MAX_AGE_MS) {
-            sum += w->buffer[i];
-            n++;
+            recent[n++] = w->buffer[i];
         }
     }
 
-    return level_from_average(sum / n);
+    // Promedio de las ALERT_TOP_SAMPLES mejores; si hay menos muestras, las que faltan valen 0.
+    float sum = 0.0f;
+    for (int k = 0; k < ALERT_TOP_SAMPLES; k++) {
+        int best = -1;
+        for (int i = 0; i < n; i++) {
+            if (best < 0 || recent[i] > recent[best]) best = i;
+        }
+        if (best >= 0) {
+            sum += recent[best];
+            recent[best] = recent[--n];   // la saca de la lista
+        }
+    }
+
+    return level_from_average(sum / ALERT_TOP_SAMPLES);
 }

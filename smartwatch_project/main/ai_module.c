@@ -90,6 +90,7 @@ static void audio_classify_task(void *arg) {
         ei_wrapper_result_t result;
         if (ei_wrapper_classify(audio_buffers[buf_idx], AUDIO_BUFFER_SIZE, &result)) {
             result.timestamp_ms = (uint32_t)(esp_timer_get_time() / 1000);
+            if (listener.on_window) listener.on_window(audio_buffers[buf_idx], AUDIO_BUFFER_SIZE, &result);
             if (listener.on_classification) listener.on_classification(&result);
         }
 

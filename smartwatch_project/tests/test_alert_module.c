@@ -14,45 +14,73 @@ static alert_level_t add_at_zero(const char *label, float confidence)
     return alert_module_add_sample(label, confidence, 0);
 }
 
+// Dos muestras iguales: con "las 2 mejores de las ultimas 4", repetir el valor hace que el
+// resultado sea ese mismo valor. Devuelve el nivel tras la segunda.
+static alert_level_t add_twice(const char *label, float confidence)
+{
+    add_at_zero(label, confidence);
+    return add_at_zero(label, confidence);
+}
+
 #define SEC 1000u
 
 void tearDown(void) {}
 
-// Con una sola muestra el promedio es la propia muestra, asi que cada borde de
+// Con dos muestras iguales el promedio de las 2 mejores es ese valor, asi que cada borde de
 // umbral se prueba con una clase distinta (una ventana limpia por valor).
 static void test_level_thresholds(void)
 {
-    TEST_ASSERT_EQUAL(ALERT_NONE,   add_at_zero("a", 0.49f));
-    TEST_ASSERT_EQUAL(ALERT_LOW,    add_at_zero("b", 0.50f));
-    TEST_ASSERT_EQUAL(ALERT_LOW,    add_at_zero("c", 0.59f));
-    TEST_ASSERT_EQUAL(ALERT_MEDIUM, add_at_zero("d", 0.60f));
-    TEST_ASSERT_EQUAL(ALERT_MEDIUM, add_at_zero("e", 0.69f));
-    TEST_ASSERT_EQUAL(ALERT_HIGH,   add_at_zero("f", 0.70f));
-    TEST_ASSERT_EQUAL(ALERT_HIGH,   add_at_zero("g", 1.00f));
+    TEST_ASSERT_EQUAL(ALERT_NONE,   add_twice("a", 0.49f));
+    TEST_ASSERT_EQUAL(ALERT_LOW,    add_twice("b", 0.50f));
+    TEST_ASSERT_EQUAL(ALERT_LOW,    add_twice("c", 0.59f));
+    TEST_ASSERT_EQUAL(ALERT_MEDIUM, add_twice("d", 0.60f));
+    TEST_ASSERT_EQUAL(ALERT_MEDIUM, add_twice("e", 0.69f));
+    TEST_ASSERT_EQUAL(ALERT_HIGH,   add_twice("f", 0.70f));
+    TEST_ASSERT_EQUAL(ALERT_HIGH,   add_twice("g", 1.00f));
 }
 
-// Con menos de 3 muestras se promedia solo lo recibido, no se rellena con ceros.
-static void test_partial_window_averages_only_received_samples(void)
+// Una sola deteccion no alcanza: las muestras que faltan valen 0, asi que 0.98 da 0.49 (NONE).
+// Antes bastaba una muestra; ahora hace falta que el sonido se repita.
+static void test_a_single_detection_alone_does_not_alert(void)
 {
+    TEST_ASSERT_EQUAL(ALERT_NONE, add_at_zero("fire", 0.98f));
+}
+
+// Dos detecciones seguidas si alertan.
+static void test_two_good_detections_alert(void)
+{
+    add_at_zero("fire", 0.9f);
     TEST_ASSERT_EQUAL(ALERT_HIGH, add_at_zero("fire", 0.9f));
 }
 
-// 1.0, 0.0, 0.0 -> promedio 0.33 -> NONE (un pico aislado no dispara la alerta).
-static void test_average_covers_the_whole_window(void)
+// Una alarma de pitidos solo se reconoce en parte de las ventanas (las demas caen en las
+// pausas). 0.98, 0, 0, 0.85 daba un promedio de 0.46 (NONE) con todas las muestras; con las 2
+// mejores es 0.915 (HIGH).
+static void test_pauses_between_detections_do_not_dilute_them(void)
 {
-    add_at_zero("fire", 1.0f);
+    add_at_zero("fire", 0.98f);
+    add_at_zero("fire", 0.0f);
+    add_at_zero("fire", 0.0f);
+    TEST_ASSERT_EQUAL(ALERT_HIGH, add_at_zero("fire", 0.85f));
+}
+
+// Un pico aislado seguido de silencio no alerta: 0.98, 0, 0 -> (0.98 + 0) / 2 = 0.49.
+static void test_an_isolated_peak_followed_by_silence_does_not_alert(void)
+{
+    add_at_zero("fire", 0.98f);
     add_at_zero("fire", 0.0f);
     TEST_ASSERT_EQUAL(ALERT_NONE, add_at_zero("fire", 0.0f));
 }
 
-// La 4a muestra desplaza a la 1a: 1.0, 1.0, 0.0, 0.0 -> ventana {1.0, 0.0, 0.0} = 0.33 (NONE).
-// Si no se descartara ninguna, el promedio de las 4 seria 0.5 (LOW).
+// La 5a muestra desplaza a la 1a: 1.0, 1.0, 0.0, 0.0, 0.0 -> ventana {1.0, 0.0, 0.0, 0.0} ->
+// las 2 mejores dan 0.5 (LOW). Si no se descartara ninguna, serian 1.0 y 1.0 (HIGH).
 static void test_window_drops_the_oldest_sample(void)
 {
     add_at_zero("fire", 1.0f);
     add_at_zero("fire", 1.0f);
     add_at_zero("fire", 0.0f);
-    TEST_ASSERT_EQUAL(ALERT_NONE, add_at_zero("fire", 0.0f));
+    add_at_zero("fire", 0.0f);
+    TEST_ASSERT_EQUAL(ALERT_LOW, add_at_zero("fire", 0.0f));
 }
 
 static void test_labels_have_independent_windows(void)
@@ -67,7 +95,7 @@ static void test_init_clears_the_history(void)
     add_at_zero("fire", 1.0f);
     add_at_zero("fire", 1.0f);
     alert_module_init();
-    // Sin historial el promedio es 0.0; con el historial anterior seria 0.67 (LOW).
+    // Sin historial el resultado es 0.0; con el historial anterior serian 1.0 y 1.0 (HIGH).
     TEST_ASSERT_EQUAL(ALERT_NONE, add_at_zero("fire", 0.0f));
 }
 
@@ -79,7 +107,7 @@ static void test_ninth_label_is_ignored_and_others_keep_working(void)
         snprintf(label, sizeof(label), "c%d", i);
         add_at_zero(label, 0.9f);
     }
-    TEST_ASSERT_EQUAL(ALERT_NONE, add_at_zero("c8", 1.0f));
+    TEST_ASSERT_EQUAL(ALERT_NONE, add_twice("c8", 1.0f));
     TEST_ASSERT_EQUAL(ALERT_HIGH, add_at_zero("c0", 0.9f));
 }
 
@@ -92,7 +120,7 @@ static void test_long_label_keeps_a_single_window(void)
         add_at_zero(long_label, 0.1f);
     }
     // Si hubiera agotado las 8 ranuras, esta clase nueva devolveria NONE.
-    TEST_ASSERT_EQUAL(ALERT_HIGH, add_at_zero("fire", 0.9f));
+    TEST_ASSERT_EQUAL(ALERT_HIGH, add_twice("fire", 0.9f));
 }
 
 // Dos lecturas altas, un largo silencio y una lectura debil: sin caducidad el promedio seria
@@ -135,8 +163,10 @@ int main(void)
 {
     UNITY_BEGIN();
     RUN_TEST(test_level_thresholds);
-    RUN_TEST(test_partial_window_averages_only_received_samples);
-    RUN_TEST(test_average_covers_the_whole_window);
+    RUN_TEST(test_a_single_detection_alone_does_not_alert);
+    RUN_TEST(test_two_good_detections_alert);
+    RUN_TEST(test_pauses_between_detections_do_not_dilute_them);
+    RUN_TEST(test_an_isolated_peak_followed_by_silence_does_not_alert);
     RUN_TEST(test_window_drops_the_oldest_sample);
     RUN_TEST(test_labels_have_independent_windows);
     RUN_TEST(test_init_clears_the_history);

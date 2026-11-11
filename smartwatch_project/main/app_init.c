@@ -13,6 +13,7 @@
 #include "vibrator_module.h"
 #include "imu_module.h"
 #include "wrist_wake.h"
+#include "audio_diag.h"
 
 #define BUTTON_PULSE_MS 100
 
@@ -81,9 +82,11 @@ void app_init(void)
         .wake_screen   = ui_post_wake_msg,
     };
     alert_dispatcher_init(&alert_outputs);
+    audio_diag_init();   // diagnostico del audio: estadisticas y volcado por serie
     const ai_listener_t ai_listener = {
         .on_audio_level    = alert_dispatcher_on_audio_level,
         .on_classification = alert_dispatcher_on_classification,
+        .on_window         = audio_diag_on_window,
     };
     ai_module_start(bsp_es8311_get_input_dev(), &ai_listener);
 

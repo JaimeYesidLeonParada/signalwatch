@@ -148,9 +148,13 @@ static void test_init_resets_the_loud_sound_state(void)
 
 // --- Clasificaciones -------------------------------------------------------
 
+// Una alerta necesita que el sonido se repita en dos clasificaciones (ver alert_module): la
+// primera no vibra, la segunda si.
 static void test_high_level_vibrates_the_morse_of_its_class(void)
 {
     ei_wrapper_result_t r = single(catalog_label(0), 0.9f);
+    alert_dispatcher_on_classification(&r);
+    TEST_ASSERT_EQUAL(0, vibration_count);
     alert_dispatcher_on_classification(&r);
     TEST_ASSERT_EQUAL(1, vibration_count);
     TEST_ASSERT_EQUAL_STRING(catalog_morse(0), vibrations[0]);
@@ -159,6 +163,7 @@ static void test_high_level_vibrates_the_morse_of_its_class(void)
 static void test_medium_level_vibrates_too(void)
 {
     ei_wrapper_result_t r = single(catalog_label(1), 0.65f);
+    alert_dispatcher_on_classification(&r);
     alert_dispatcher_on_classification(&r);
     TEST_ASSERT_EQUAL(1, vibration_count);
     TEST_ASSERT_EQUAL_STRING(catalog_morse(1), vibrations[0]);
@@ -173,7 +178,10 @@ static void test_low_and_none_levels_do_not_vibrate(void)
     r.count = 2;
 
     alert_dispatcher_on_classification(&r);
-    TEST_ASSERT_EQUAL(2, icon_count);
+    alert_dispatcher_on_classification(&r);
+    TEST_ASSERT_EQUAL(4, icon_count);
+    TEST_ASSERT_EQUAL(ALERT_LOW, icons[2].level);    // 0.55 repetido
+    TEST_ASSERT_EQUAL(ALERT_NONE, icons[3].level);   // 0.1 repetido
     TEST_ASSERT_EQUAL(0, vibration_count);
 }
 
@@ -182,10 +190,11 @@ static void test_unknown_class_does_not_vibrate_but_updates_its_icon(void)
 {
     ei_wrapper_result_t r = single("dog-barking", 0.9f);
     alert_dispatcher_on_classification(&r);
+    alert_dispatcher_on_classification(&r);
     TEST_ASSERT_EQUAL(0, vibration_count);
-    TEST_ASSERT_EQUAL(1, icon_count);
-    TEST_ASSERT_EQUAL_STRING("dog-barking", icons[0].label);
-    TEST_ASSERT_EQUAL(ALERT_HIGH, icons[0].level);
+    TEST_ASSERT_EQUAL(2, icon_count);
+    TEST_ASSERT_EQUAL_STRING("dog-barking", icons[1].label);
+    TEST_ASSERT_EQUAL(ALERT_HIGH, icons[1].level);
 }
 
 // Cada clase del resultado recibe su propio nivel, en el orden en que llegan.
@@ -201,13 +210,14 @@ static void test_each_class_updates_its_icon_with_its_own_level(void)
     r.count = 3;
 
     alert_dispatcher_on_classification(&r);
-    TEST_ASSERT_EQUAL(3, icon_count);
-    TEST_ASSERT_EQUAL_STRING(catalog_label(0), icons[0].label);
-    TEST_ASSERT_EQUAL(ALERT_HIGH,   icons[0].level);
-    TEST_ASSERT_EQUAL_STRING(catalog_label(1), icons[1].label);
-    TEST_ASSERT_EQUAL(ALERT_MEDIUM, icons[1].level);
-    TEST_ASSERT_EQUAL_STRING(catalog_label(2), icons[2].label);
-    TEST_ASSERT_EQUAL(ALERT_NONE,   icons[2].level);
+    alert_dispatcher_on_classification(&r);   // con la 2a muestra el nivel refleja la confianza
+    TEST_ASSERT_EQUAL(6, icon_count);
+    TEST_ASSERT_EQUAL_STRING(catalog_label(0), icons[3].label);
+    TEST_ASSERT_EQUAL(ALERT_HIGH,   icons[3].level);
+    TEST_ASSERT_EQUAL_STRING(catalog_label(1), icons[4].label);
+    TEST_ASSERT_EQUAL(ALERT_MEDIUM, icons[4].level);
+    TEST_ASSERT_EQUAL_STRING(catalog_label(2), icons[5].label);
+    TEST_ASSERT_EQUAL(ALERT_NONE,   icons[5].level);
 }
 
 // Al mensaje de inferencia llega la mejor clase (best_index), no la primera.
@@ -230,9 +240,12 @@ static void test_class_alert_wakes_the_screen(void)
 {
     ei_wrapper_result_t high = single(catalog_label(0), 0.9f);
     alert_dispatcher_on_classification(&high);
+    TEST_ASSERT_EQUAL(0, wake_count);   // una sola deteccion aun no es alerta
+    alert_dispatcher_on_classification(&high);
     TEST_ASSERT_EQUAL(1, wake_count);
 
     ei_wrapper_result_t medium = single(catalog_label(1), 0.65f);
+    alert_dispatcher_on_classification(&medium);
     alert_dispatcher_on_classification(&medium);
     TEST_ASSERT_EQUAL(2, wake_count);
 }
