@@ -19,6 +19,7 @@
 - **Morse vibration.** Each class has its own letter (A, B, F) played on the vibration motor, so you can tell the alert apart without looking.
 - **Live feedback on screen:** audio level meter, one icon per class, clock with date, and battery indicator.
 - **Always-on clock** backed by a PCF85063 RTC.
+- **Screen saver.** The backlight turns off after 30 s without use. A touch, the BOOT button, a class alert or raising the wrist to look at the watch (QMI8658 accelerometer, only watched while the screen is off) turns it back on. The touch or button press that wakes the screen does nothing else, so nothing is pressed by accident.
 - **Set the time and date on the watch.** Swipe left on the main screen to open the settings screen, tap hour, minute, month or year to select it, adjust it with the large "-" and "+" buttons (hold to repeat) and tap the red check to save it to the RTC. Swipe right to go back without saving. A very confident alert (above 90 %) takes you back to the main screen on its own.
 
 <p align="center">
@@ -67,11 +68,18 @@ The firmware follows SOLID principles. Modules do not know each other: `app_init
 |---|---|
 | Composition root | `app_init.c` |
 | Audio and AI | `bsp_es8311`, `ai_module`, `ei_wrapper`, `alert_module`, `alert_catalog`, `alert_dispatcher` |
-| Hardware | `display_hw`, `i2c_bus`, `touch_module`, `button_module`, `rtc_module`, `battery_module`, `vibrator_module` |
-| UI | `ui`, `ui_clock`, `ui_battery`, `ui_vu`, `ui_alerts`, `ui_notification`, `ui_settings` |
-| Pure logic (unit tested) | `morse`, `rtc_codec`, `battery_math`, `clock_format`, `audio_level`, `audio_preroll`, `time_edit`, `alert_urgent`, plus `alert_module` and `alert_catalog` |
+| Hardware | `display_hw`, `i2c_bus`, `touch_module`, `button_module`, `rtc_module`, `battery_module`, `vibrator_module`, `imu_module` |
+| UI | `ui`, `ui_clock`, `ui_battery`, `ui_vu`, `ui_alerts`, `ui_notification`, `ui_settings`, `ui_sleep` |
+| Pure logic (unit tested) | `morse`, `rtc_codec`, `battery_math`, `clock_format`, `audio_level`, `audio_preroll`, `time_edit`, `alert_urgent`, `screen_policy`, `wrist_gesture`, plus `alert_module` and `alert_catalog` |
 
 Logic that does not need hardware lives in its own file, so it can be tested on a PC. The hardware modules only call it. `alert_dispatcher` receives its outputs (UI and vibrator) from `app_init.c` instead of including them.
+
+### Screen saver
+
+- `screen_policy`: pure logic that decides when the screen is on. It receives activity and the passing of time, and says when to turn it off. It knows nothing about the backlight or LVGL.
+- `display_power.h`: a one-function interface (`on`/`off`). `display_hw` implements it with the backlight; putting the panel to sleep later would not change anything else.
+- `ui_sleep`: joins the policy with LVGL (touch inactivity, the shield that swallows the waking touch).
+- Wake sources only report "there was activity" through callbacks: `button_module`, the alert dispatcher (`wake_screen` output) and `wrist_wake`. `wrist_gesture` is the pure detector (arm lowered, then raised and held still), `imu_module` is the QMI8658 driver. `app_init.c` connects them and turns the accelerometer on only while the screen is off.
 
 ### Setting the time
 
@@ -98,6 +106,8 @@ The unit tests run on the PC with gcc and [Unity](https://github.com/ThrowTheSwi
 | `clock_format` | 12-hour clock and date text |
 | `time_edit` | Editing hour, minute, day, month and year: wrap-around, month lengths, leap years, weekday |
 | `alert_urgent` | Which alerts are urgent enough to leave the settings screen |
+| `screen_policy` | When the screen turns off and on: timeout, wake, counter wrap-around |
+| `wrist_gesture` | Raise-the-wrist detection: lowered arm first, held still, no false triggers |
 | `audio_level`, `audio_preroll` | Audio level and the pre-trigger buffer order |
 | `alert_dispatcher` | When to vibrate and notify, with fake outputs |
 

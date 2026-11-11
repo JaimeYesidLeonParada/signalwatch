@@ -11,6 +11,8 @@
 #include "ai_module.h"
 #include "alert_dispatcher.h"
 #include "vibrator_module.h"
+#include "imu_module.h"
+#include "wrist_wake.h"
 
 #define BUTTON_PULSE_MS 100
 
@@ -18,6 +20,17 @@
 static void button_feedback(void)
 {
     vibrator_pulse(BUTTON_PULSE_MS);
+}
+
+// Enciende o apaga la pantalla. Con ella apagada se vigila el gesto de muneca para volver a
+// encenderla; con ella encendida el acelerometro duerme.
+static void screen_power(bool on)
+{
+    if (!on) {
+        wrist_wake_reset();   // hay que ver el brazo caido antes de aceptar un gesto
+    }
+    display_hw_set_backlight(on);
+    imu_set_enabled(!on);
 }
 
 // Composition root: aqui se crean los modulos y se conectan entre si. El orden
@@ -31,7 +44,7 @@ void app_init(void)
     // ui_start, y touch necesita el display ya inicializado.
     lv_disp_t *disp = display_hw_init();
     ui_start(disp);
-    ui_set_display_power(display_hw_set_backlight);   // la UI apaga la pantalla si no se usa
+    ui_set_display_power(screen_power);   // la UI apaga la pantalla si no se usa
 
     i2c_master_bus_handle_t bus_handle = i2c_bus_init();
 
@@ -42,6 +55,13 @@ void app_init(void)
     ui_set_time_source(rtc_read_wall_time);   // los ajustes leen la hora del RTC...
     ui_set_time_sink(rtc_set_time);          // ...y guardan en el RTC la que el usuario edita
     touch_init(bus_handle, disp);
+
+    // Gesto de muneca: el acelerometro entrega muestras al detector solo con la pantalla apagada,
+    // y el gesto enciende la pantalla igual que una alerta. Si el sensor no esta, no pasa nada.
+    wrist_wake_init(ui_post_wake_msg);   // necesita la cola de ui
+    if (imu_init(bus_handle)) {
+        imu_start(wrist_wake_on_sample);
+    }
 
     ui_set_button_feedback(button_feedback);
     button_init(ui_post_button_msg);   // necesita la cola de ui
