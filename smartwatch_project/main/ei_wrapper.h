@@ -20,6 +20,7 @@ typedef struct {
     int count;
     int best_index;
     int timing_ms;
+    uint32_t timestamp_ms;   // cuando se clasifico; lo pone quien captura el audio (ai_module)
 } ei_wrapper_result_t;
 
 // Inicia el modelo (reserva de memoria, etc)

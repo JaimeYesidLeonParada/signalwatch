@@ -13,6 +13,7 @@ typedef struct {
     char label[32];
     bool in_use;
     float buffer[ALERT_WINDOW_SIZE];
+    uint32_t time_ms[ALERT_WINDOW_SIZE];   // cuando llego cada muestra
     int head;
     int count;
 } alert_window_t;
@@ -49,18 +50,27 @@ static alert_level_t level_from_average(float avg)
     return ALERT_NONE;
 }
 
-alert_level_t alert_module_add_sample(const char *label, float confidence)
+alert_level_t alert_module_add_sample(const char *label, float confidence, uint32_t now_ms)
 {
     alert_window_t *w = find_or_register(label);
     if (w == NULL) return ALERT_NONE;
 
     w->buffer[w->head] = confidence;
+    w->time_ms[w->head] = now_ms;
     w->head = (w->head + 1) % ALERT_WINDOW_SIZE;
     if (w->count < ALERT_WINDOW_SIZE) w->count++;
 
+    // Solo cuentan las muestras recientes: tras un rato sin sonido, lo que se oyo antes ya no
+    // describe lo que pasa ahora. La resta sin signo es correcta aunque now_ms haya dado la
+    // vuelta. La muestra nueva (edad 0) siempre cuenta, asi que n >= 1.
     float sum = 0.0f;
-    for (int i = 0; i < w->count; i++) sum += w->buffer[i];
-    float avg = sum / w->count;
+    int n = 0;
+    for (int i = 0; i < w->count; i++) {
+        if ((uint32_t)(now_ms - w->time_ms[i]) <= ALERT_SAMPLE_MAX_AGE_MS) {
+            sum += w->buffer[i];
+            n++;
+        }
+    }
 
-    return level_from_average(avg);
+    return level_from_average(sum / n);
 }

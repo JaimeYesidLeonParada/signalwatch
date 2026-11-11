@@ -50,7 +50,8 @@ void alert_dispatcher_on_classification(const ei_wrapper_result_t *result)
 
     for (int i = 0; i < result->count; i++) {
         const char *label = result->classifications[i].label;
-        alert_level_t lvl = alert_module_add_sample(label, result->classifications[i].confidence);
+        alert_level_t lvl = alert_module_add_sample(label, result->classifications[i].confidence,
+                                                  result->timestamp_ms);
         ESP_LOGI(TAG, "    %s -> nivel post-procesado: %s", label, ALERT_LEVEL_NAMES[lvl]);
         if (outputs.alert_icon) outputs.alert_icon(label, (int)lvl);
 
