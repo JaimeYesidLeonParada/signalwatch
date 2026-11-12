@@ -10,12 +10,18 @@
 //   2. Si AUDIO_DIAG_DUMP esta en 1, ademas vuelca por el puerto serie el audio de una ventana
 //      cada AUDIO_DIAG_DUMP_INTERVAL_MS, en base64, para convertirlo en un WAV con
 //      tools/audiodump_to_wav.py y escucharlo, analizarlo o subirlo a Edge Impulse.
+//      Con AUDIO_DIAG_DUMP_ONLY_ALERTS en 1 solo se vuelcan las ventanas que el modelo
+//      clasifica como una clase de alerta (ambulancia, bebe, fuego...). Asi, con musica o
+//      ruido de fondo, se capturan justo las falsas alarmas (y las alarmas reales), no el
+//      ruido normal.
 //
 // Es solo una herramienta de diagnostico: no cambia lo que hace el reloj.
 
 // 1 = volcar el audio por serie (genera mucho texto en el monitor). 0 = solo las estadisticas.
 #define AUDIO_DIAG_DUMP              0
-#define AUDIO_DIAG_DUMP_INTERVAL_MS  8000
+// 1 = volcar solo ventanas clasificadas como clase de alerta. 0 = cualquiera (cada intervalo).
+#define AUDIO_DIAG_DUMP_ONLY_ALERTS  1
+#define AUDIO_DIAG_DUMP_INTERVAL_MS  4000
 
 // Reserva el buffer del volcado y lanza su tarea. Llamar una vez antes de recibir ventanas.
 void audio_diag_init(void);

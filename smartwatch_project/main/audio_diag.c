@@ -1,6 +1,7 @@
 #include "audio_diag.h"
 #include "audio_stats.h"
 #include "base64_encode.h"
+#include "alert_catalog.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -77,6 +78,12 @@ void audio_diag_on_window(const int16_t *samples, int n, const ei_wrapper_result
              st.clipped, n > 0 ? (st.clipped * 100) / n : 0, best, (double)best_conf);
 
 #if AUDIO_DIAG_DUMP
+#if AUDIO_DIAG_DUMP_ONLY_ALERTS
+    // Solo las ventanas que el modelo clasifica como una clase del catalogo de alertas.
+    if (alert_catalog_index_of(best) < 0) {
+        return;
+    }
+#endif
     int64_t now = esp_timer_get_time();
     if (dump_buf == NULL || dump_busy || n <= 0 ||
         (now - last_dump_us) < (int64_t)AUDIO_DIAG_DUMP_INTERVAL_MS * 1000) {
